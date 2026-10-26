@@ -1,0 +1,16 @@
+{
+  "name": "dhun-telegram-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Telegram relay for Dhun Commons in Logos Basecamp",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node bridge.mjs",
+    "check": "node bridge.mjs --check",
+    "test": "node --test test/*.test.mjs"
+  },
+  "license": "UNLICENSED"
+}

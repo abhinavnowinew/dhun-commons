@@ -1,0 +1,66 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  telegram:
+    name: Telegram bridge tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax check
+        working-directory: telegram
+        run: |
+          for file in bridge.mjs lib/*.mjs testkit/*.mjs test/*.mjs; do
+            node --check "$file"
+          done
+      - name: Tests
+        working-directory: telegram
+        run: npm test
+
+  secrets:
+    name: Secret guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse committed tokens, keys and wallet material
+        run: |
+          set -eu
+          fail=0
+          if git ls-files | grep -E '(^|/)(\.env$|\.env\.[^e]|storage\.json$|roles\.json$|config\.json$)'; then
+            echo "::error::Committed environment or wallet file"; fail=1
+          fi
+          if git grep -n -I -E '[0-9]{8,10}:[A-Za-z0-9_-]{35}' -- . ':!*.lock'; then
+            echo "::error::A Telegram bot token pattern is committed"; fail=1
+          fi
+          if git grep -n -I -E 'AIza[0-9A-Za-z_-]{35}' -- . ':!*.lock'; then
+            echo "::error::A Google Maps key pattern is committed"; fail=1
+          fi
+          exit "$fail"
+
+  module:
+    name: Module manifest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate metadata and relay wiring
+        run: |
+          set -eu
+          node -e '
+            const fs = require("fs");
+            const m = JSON.parse(fs.readFileSync("metadata.json", "utf8"));
+            if (m.name !== "dhun_commons") throw new Error("unexpected module name: " + m.name);
+            const deps = m.dependencies || [];
+            if (!Array.isArray(deps)) throw new Error("dependencies must be an array of strings for Basecamp 0.2.3");
+            if (!deps.includes("lez_core")) throw new Error("lez_core dependency is missing");
+          '
+          grep -q 'publishTelegramState' src/dhun_commons.rep
+          grep -q 'publishTelegramState' src/dhun_commons_backend.cpp
+          grep -q 'publishTelegramState' qml/Main.qml
+          test -f qml/Main.qml
+          test -f tests/Flow.qml

@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>Dhun Field Studio</title>
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<svg class="svg-defs" aria-hidden="true">
+    <symbol id="i-leaf" viewBox="0 0 24 24">
+        <path d="M5 19c0-8 5.5-13 15-14 0 10-5 15-13 15H5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+        <path d="M6.5 17.5 16 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-search" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="6.4" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="m16 16 4.2 4.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24">
+        <path d="M12 21s6.5-6.1 6.5-11A6.5 6.5 0 0 0 5.5 10c0 4.9 6.5 11 6.5 11Z" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <circle cx="12" cy="10" r="2.3" fill="none" stroke="currentColor" stroke-width="1.8"/>
+    </symbol>
+    <symbol id="i-video" viewBox="0 0 24 24">
+        <rect x="3" y="6.5" width="12.5" height="11" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="m15.5 10 5-2.4v8.8l-5-2.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24">
+        <rect x="3.5" y="5" width="17" height="15.5" rx="2.4" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M3.5 9.5h17M8 3.5v3M16 3.5v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24">
+        <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24">
+        <path d="M5 12h14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-crosshair" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="6.2" fill="none" stroke="currentColor" stroke-width="1.7"/>
+        <path d="M12 2.5v3.2M12 18.3v3.2M2.5 12h3.2M18.3 12h3.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-close" viewBox="0 0 24 24">
+        <path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-left" viewBox="0 0 24 24">
+        <path d="m14.5 6-6 6 6 6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="i-right" viewBox="0 0 24 24">
+        <path d="m9.5 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="i-share" viewBox="0 0 24 24">
+        <circle cx="17.5" cy="5.5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/>
+        <circle cx="6" cy="12" r="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/>
+        <circle cx="17.5" cy="18.5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/>
+        <path d="m8.3 10.8 6.9-4M8.3 13.2l6.9 4" fill="none" stroke="currentColor" stroke-width="1.7"/>
+    </symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24">
+        <path d="M4 8.5h3l1.4-2h7.2l1.4 2h3a1 1 0 0 1 1 1V18a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5a1 1 0 0 1 1-1Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+        <circle cx="12" cy="13.4" r="3.2" fill="none" stroke="currentColor" stroke-width="1.7"/>
+    </symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24">
+        <path d="M12 16V4.5M7.5 9 12 4.5 16.5 9M4.5 15.5v3a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 24 24">
+        <path d="m5 12.5 4.5 4.5L19 6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24">
+        <path d="M12 3 19 6v6c0 4.4-3 7.7-7 9-4-1.3-7-4.6-7-9V6l7-3Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+        <path d="m9 12 2.2 2.2L15.5 10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24">
+        <path d="m12 3 9 5-9 5-9-5 9-5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+        <path d="m3 12.5 9 5 9-5M3 16.5l9 5 9-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="i-play" viewBox="0 0 24 24">
+        <path d="M8 5.5v13l10-6.5-10-6.5Z" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-key" viewBox="0 0 24 24">
+        <circle cx="8" cy="9" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/>
+        <path d="m11 12 9 9M16 17l2-2M18.5 19.5l2-2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+    </symbol>
+</svg>
+
+<div id="app" class="app">
+    <header class="topbar">
+        <div class="brand">
+            <div class="brand-mark"><svg><use href="#i-leaf"/></svg></div>
+            <div>
+                <div class="brand-name">Dhun <span>Field Studio</span></div>
+                <div class="brand-sub">Chak Gulabpura &middot; 500 acres &middot; live map</div>
+            </div>
+        </div>
+
+        <div class="role-switch" id="roleSwitch" role="group" aria-label="Viewing as">
+            <button type="button" data-role="funder">Funder</button>
+            <button type="button" data-role="dhun">Dhun</button>
+            <button type="button" data-role="steward">Steward</button>
+        </div>
+
+        <div class="search-wrap">
+            <svg class="search-icon"><use href="#i-search"/></svg>
+            <input id="searchInput" type="search" autocomplete="off" spellcheck="false"
+                   placeholder="Search produce, growers, or a place&hellip;" aria-label="Search produce, growers or places">
+            <kbd>Ctrl K</kbd>
+            <div id="searchResults" class="search-results hidden" role="listbox"></div>
+        </div>
+
+        <div class="top-actions">
+            <button class="btn btn-ghost light" id="updatesBtn" type="button">
+                <svg><use href="#i-play"/></svg>
+                Updates <span id="updateCount" class="count">0</span>
+            </button>
+            <button class="btn btn-ghost light icon-only" id="setupBtn" type="button" title="Google Maps key" aria-label="Google Maps key">
+                <svg><use href="#i-key"/></svg>
+            </button>
+            <button class="btn btn-lime" id="recordBtn" type="button">
+                <svg><use href="#i-video"/></svg>
+                Record update
+            </button>
+        </div>
+    </header>
+
+    <main class="workspace">
+        <section class="map-panel" id="mapPanel" aria-label="Farm map">
+            <div id="map" class="google-map hidden"></div>
+
+            <div id="mapFallback" class="map-fallback">
+                <img src="../assets/dhun-satellite.jpg" alt="Satellite view of Dhun at Chak Gulabpura" id="fallbackImage">
+                <div class="fallback-shade"></div>
+                <div id="fallbackPins" class="fallback-pins"></div>
+                <div class="fallback-flag">
+                    <span class="flag-dot"></span>
+                    <span id="fallbackFlagText">Plan view &middot; satellite tiles are still loading</span>
+                </div>
+            </div>
+
+            <div class="map-top">
+                <div class="segmented" id="seasonSwitch" role="group" aria-label="Produce filter">
+                    <button type="button" data-season="current" class="active">In season</button>
+                    <button type="button" data-season="all">All produce</button>
+                </div>
+                <div class="map-tools">
+                    <button class="map-btn icon-only" id="locateBtn" type="button" title="Recentre on Dhun" aria-label="Recentre on Dhun">
+                        <svg><use href="#i-crosshair"/></svg>
+                    </button>
+                    <button class="map-btn" id="addActivityBtn" type="button">
+                        <svg><use href="#i-pin"/></svg>
+                        Mark activity
+                    </button>
+                </div>
+            </div>
+
+            <div class="map-badge" id="mapBadge">
+                <span class="live-dot"></span>
+                <span id="mapBadgeText">LOCAL PLAN VIEW</span>
+            </div>
+
+            <div class="placement-hint hidden" id="placementHint">
+                <svg><use href="#i-crosshair"/></svg>
+                Tap anywhere on the map to place this activity
+                <button type="button" id="cancelPlacement">Cancel</button>
+            </div>
+
+            <aside class="map-card hidden" id="mapCard" aria-live="polite"></aside>
+
+            <div class="map-legend">
+                <span><i class="dot zone"></i> field zone</span>
+                <span><i class="dot produce"></i> produce plot</span>
+                <span><i class="dot activity"></i> activity</span>
+                <span class="legend-fresh" id="freshnessLabel"></span>
+            </div>
+
+            <div class="key-notice hidden" id="keyNotice">
+                <div class="key-notice-icon"><svg><use href="#i-key"/></svg></div>
+                <div>
+                    <strong>Google place search is optional.</strong>
+                    <p>The satellite map works without a key. A key switches place search from OpenStreetMap to Google and is only stored in this browser.</p>
+                </div>
+                <button class="btn btn-dark" type="button" id="keyNoticeBtn">Add key</button>
+            </div>
+        </section>
+
+        <aside class="side-rail">
+            <section class="card calendar-card">
+                <header class="card-head">
+                    <div>
+                        <p class="eyebrow">Work calendar</p>
+                        <h2 id="calendarTitle">This month</h2>
+                    </div>
+                    <div class="month-nav">
+                        <button type="button" id="prevMonth" aria-label="Previous month"><svg><use href="#i-left"/></svg></button>
+                        <button type="button" id="nextMonth" aria-label="Next month"><svg><use href="#i-right"/></svg></button>
+                    </div>
+                </header>
+                <div class="calendar-stats" id="calendarStats"></div>
+                <div class="weekdays" aria-hidden="true">
+                    <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+                </div>
+                <div class="calendar-grid" id="calendarGrid"></div>
+                <button class="calendar-add" id="calendarAdd" type="button">
+                    <svg><use href="#i-plus"/></svg>
+                    Add work for this day
+                </button>
+            </section>
+
+            <section class="card agenda-card">
+                <header class="card-head">
+                    <div>
+                        <p class="eyebrow" id="agendaEyebrow">Selected day</p>
+                        <h3 id="agendaTitle">Today</h3>
+                    </div>
+                    <span class="role-tag" id="agendaRole">Dhun</span>
+                </header>
+                <div class="agenda-list" id="agendaList"></div>
+            </section>
+        </aside>
+    </main>
+
+    <section class="dock" aria-label="Live farmer inventory">
+        <header class="dock-head">
+            <div class="dock-title">
+                <p class="eyebrow">Live farmer inventory</p>
+                <h2>Pick from the map</h2>
+                <p id="inventoryUpdated" class="dock-updated">Inventory refreshed just now</p>
+            </div>
+            <div class="dock-filters" id="dockFilters" role="group" aria-label="Produce filters"></div>
+            <div class="dock-summary">
+                <strong id="dockCount">0</strong>
+                <span>produce plots<br>with stock</span>
+            </div>
+        </header>
+        <div class="produce-scroller" id="produceDock"></div>
+    </section>
+</div>
+
+<div class="scrim hidden" id="scrim"></div>
+
+<aside class="drawer hidden" id="updatesDrawer" aria-label="Field updates">
+    <header class="drawer-head">
+        <div>
+            <p class="eyebrow">Field updates</p>
+            <h2>Shared from the field</h2>
+        </div>
+        <button class="icon-btn" id="closeUpdates" type="button" aria-label="Close updates"><svg><use href="#i-close"/></svg></button>
+    </header>
+    <div class="drawer-note">
+        <svg><use href="#i-shield"/></svg>
+        <span id="drawerNoteText">Updates stay in this browser in the rehearsal. In the wallet, shared updates are posted to the local coordination room.</span>
+    </div>
+    <div class="updates-list" id="updatesList"></div>
+    <div class="drawer-foot">
+        <button class="btn btn-dark" id="drawerRecord" type="button"><svg><use href="#i-video"/></svg> Record a new update</button>
+    </div>
+</aside>
+
+<div class="modal-layer hidden" id="activityModal" role="dialog" aria-modal="true" aria-labelledby="activityModalTitle">
+    <div class="modal">
+        <header class="modal-head">
+            <div>
+                <p class="eyebrow">Field log</p>
+                <h2 id="activityModalTitle">Mark an activity</h2>
+            </div>
+            <button class="icon-btn" type="button" data-close="activityModal" aria-label="Close"><svg><use href="#i-close"/></svg></button>
+        </header>
+        <form id="activityForm" novalidate>
+            <div class="field-grid">
+                <label class="field span-2">
+                    <span>What are you doing?</span>
+                    <input id="activityTitle" name="title" maxlength="90" placeholder="e.g. Sow the sarson block" required>
+                </label>
+                <div class="field span-2">
+                    <span>Activity type</span>
+                    <div class="type-picker" id="activityTypes"></div>
+                </div>
+                <label class="field">
+                    <span>Field zone</span>
+                    <select id="activityZone" name="zone"></select>
+                </label>
+                <label class="field">
+                    <span>Produce</span>
+                    <select id="activityProduce" name="produce"></select>
+                </label>
+                <label class="field">
+                    <span>Who is working?</span>
+                    <select id="activityRole" name="role"></select>
+                </label>
+                <label class="field">
+                    <span>Date</span>
+                    <input id="activityDate" name="date" type="date" required>
+                </label>
+                <label class="field">
+                    <span>Start time</span>
+                    <input id="activityTime" name="time" type="time" value="08:00">
+                </label>
+                <label class="field">
+                    <span>Visibility</span>
+                    <select id="activityVisibility">
+                        <option value="room">Coordination room</option>
+                        <option value="private">Only me</option>
+                    </select>
+                </label>
+                <label class="field span-2">
+                    <span>Notes</span>
+                    <textarea id="activityNotes" rows="3" maxlength="500" placeholder="Covenant notes, seed lot, evidence you will file&hellip;"></textarea>
+                </label>
+            </div>
+            <div class="location-row">
+                <svg><use href="#i-pin"/></svg>
+                <span id="activityLocation">Location: centre of the field</span>
+                <button type="button" class="link-btn" id="pickOnMap">Pick on map</button>
+            </div>
+            <div class="form-error hidden" id="activityError"></div>
+            <footer class="modal-foot">
+                <button type="button" class="btn btn-ghost" data-close="activityModal">Cancel</button>
+                <button type="submit" class="btn btn-dark">Add to calendar</button>
+            </footer>
+        </form>
+    </div>
+</div>
+
+<div class="modal-layer hidden" id="videoModal" role="dialog" aria-modal="true" aria-labelledby="videoModalTitle">
+    <div class="modal modal-video">
+        <header class="modal-head">
+            <div>
+                <p class="eyebrow">Video update</p>
+                <h2 id="videoModalTitle">Show the work</h2>
+            </div>
+            <button class="icon-btn" type="button" data-close="videoModal" aria-label="Close"><svg><use href="#i-close"/></svg></button>
+        </header>
+        <div class="video-grid">
+            <div class="video-stage">
+                <video id="videoPreview" playsinline muted></video>
+                <div class="video-empty" id="videoEmpty">
+                    <svg><use href="#i-camera"/></svg>
+                    <strong>Camera preview</strong>
+                    <span>Record up to <span id="maxVideoLabel">20</span> seconds, or attach a clip.</span>
+                </div>
+                <div class="record-timer hidden" id="recordTimer">00:00</div>
+            </div>
+            <div class="video-controls">
+                <button class="btn btn-dark" id="startCamera" type="button"><svg><use href="#i-camera"/></svg> Start camera</button>
+                <button class="btn btn-lime hidden" id="toggleRecord" type="button"><span class="rec-dot"></span> Start recording</button>
+                <label class="btn btn-ghost file-btn">
+                    <svg><use href="#i-upload"/></svg> Attach a clip
+                    <input id="videoFile" type="file" accept="video/*" hidden>
+                </label>
+                <p class="camera-status" id="cameraStatus">Camera access is requested only when you start it.</p>
+            </div>
+        </div>
+        <form id="videoForm" novalidate>
+            <div class="field-grid">
+                <label class="field span-2">
+                    <span>Update title</span>
+                    <input id="videoTitle" maxlength="90" placeholder="e.g. First pass through the mustard beds" required>
+                </label>
+                <label class="field">
+                    <span>Produce</span>
+                    <select id="videoProduce"></select>
+                </label>
+                <label class="field">
+                    <span>Field zone</span>
+                    <select id="videoZone"></select>
+                </label>
+                <label class="field">
+                    <span>Also add to calendar</span>
+                    <input id="videoDate" type="date">
+                </label>
+                <label class="field">
+                    <span>Start time</span>
+                    <input id="videoTime" type="time" value="08:00">
+                </label>
+                <label class="field span-2">
+                    <span>What should the other signers know?</span>
+                    <textarea id="videoNotes" rows="3" maxlength="500" placeholder="Crop stage, covenant condition, what happens next&hellip;"></textarea>
+                </label>
+            </div>
+            <div class="consent-row">
+                <svg><use href="#i-shield"/></svg>
+                <span>Film only people who have agreed to appear. A video is not proof of a covenant; the program still verifies approvals.</span>
+            </div>
+            <div class="form-error hidden" id="videoError"></div>
+            <footer class="modal-foot">
+                <span class="share-hint" id="videoShareHint">Posts to the local studio feed.</span>
+                <button type="button" class="btn btn-ghost" data-close="videoModal">Cancel</button>
+                <button type="submit" class="btn btn-dark">Post update</button>
+            </footer>
+        </form>
+    </div>
+</div>
+
+<div class="modal-layer hidden" id="setupModal" role="dialog" aria-modal="true" aria-labelledby="setupModalTitle">
+    <div class="modal modal-setup">
+        <header class="modal-head">
+            <div>
+                <p class="eyebrow">Map setup</p>
+                <h2 id="setupModalTitle">Connect Google Maps</h2>
+            </div>
+            <button class="icon-btn" type="button" data-close="setupModal" aria-label="Close"><svg><use href="#i-close"/></svg></button>
+        </header>
+        <div class="setup-body">
+            <p class="setup-lede">The studio shows keyless satellite imagery and OpenStreetMap place search out of the box. A Google key is optional and switches place search to Google Geocoding.</p>
+            <div class="setup-warning">
+                <svg><use href="#i-shield"/></svg>
+                <div>
+                    <strong>Use a restricted, rotated key.</strong>
+                    <p>Restrict the key to <em>Maps JavaScript API</em> and <em>Geocoding API</em>, and to the referrer <code id="referrerText">http://127.0.0.1:8788/*</code>. Never commit it or paste it into chat. This field stores it in localStorage only.</p>
+                </div>
+            </div>
+            <label class="field">
+                <span>Google Maps API key</span>
+                <input id="mapsKeyInput" type="password" autocomplete="off" spellcheck="false" placeholder="AIza&hellip;">
+            </label>
+            <div class="setup-actions">
+                <button class="btn btn-dark" id="saveKey" type="button">Save Google key</button>
+                <button class="btn btn-ghost" id="removeKey" type="button">Remove key</button>
+                <a class="link-btn" href="https://console.cloud.google.com/google/maps-apis/credentials" target="_blank" rel="noreferrer">Google Cloud credentials</a>
+            </div>
+            <p class="setup-note">Places Autocomplete is not required. Without a key, search uses OpenStreetMap Photon over the result text, plus the local produce and grower index.</p>
+        </div>
+    </div>
+</div>
+
+<div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
+
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="config.js"></script>
+<script src="core.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

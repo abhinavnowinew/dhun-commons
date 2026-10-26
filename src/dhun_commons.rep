@@ -1,0 +1,23 @@
+class DhunCommons
+{
+    SLOT(QString createWallet(QString password))
+    SLOT(QString openWallet())
+    SLOT(QString refreshChain())
+    SLOT(QString sendSettlement(QString fromAccountId, QString toAccountId, QString amount))
+    SLOT(QString checkTransaction(QString txHash))
+    SLOT(QString chainDetails())
+    SLOT(QString publishTelegramState(QString json))
+    SLOT(QString telegramInbox())
+    SLOT(QString ackTelegramMessage(QString id))
+
+    PROP(QString chainStatus="uninitialized" READONLY)
+    PROP(QString chainNotice="" READONLY)
+    PROP(QString chainNetwork="LEZ public testnet" READONLY)
+    PROP(QString chainSequencer="" READONLY)
+    PROP(QString chainAccounts="[]" READONLY)
+    PROP(int chainHeight=0 READONLY)
+    PROP(QString chainWalletPath="" READONLY)
+    PROP(QString chainLastTx="{}" READONLY)
+    PROP(bool chainBusy=false READONLY)
+    PROP(QString telegramDir="" READONLY)
+}

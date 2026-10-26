@@ -1,0 +1,296 @@
+{
+  "bajra": {
+    "title": "File:Pennisetum glaucum (4657012430).jpg",
+    "license": "CC BY-SA 2.0",
+    "artist": "Dinesh Valke from Thane, India",
+    "source": "https://commons.wikimedia.org/wiki/File:Pennisetum_glaucum_(4657012430).jpg",
+    "file": "qml/assets/produce/bajra.jpg"
+  },
+  "jowar": {
+    "title": "File:Sorghum bicolor (Moench).JPG",
+    "license": "CC BY-SA 3.0",
+    "artist": "Daniel Georg Döhne (user Bugdream)",
+    "source": "https://commons.wikimedia.org/wiki/File:Sorghum_bicolor_(Moench).JPG",
+    "file": "qml/assets/produce/jowar.jpg"
+  },
+  "gehun": {
+    "title": "File:Dried wheat field, gujarat.jpg",
+    "license": "CC BY-SA 4.0",
+    "artist": "Muku0793",
+    "source": "https://commons.wikimedia.org/wiki/File:Dried_wheat_field,_gujarat.jpg",
+    "file": "qml/assets/produce/gehun.jpg"
+  },
+  "til": {
+    "title": "File:Sesamum indicum-- The Sesame Flower (26779961292).jpg",
+    "license": "CC BY 2.0",
+    "artist": "Dick Culbert from Gibsons, B.C., Canada",
+    "source": "https://commons.wikimedia.org/wiki/File:Sesamum_indicum--_The_Sesame_Flower_(26779961292).jpg",
+    "file": "qml/assets/produce/til.jpg"
+  },
+  "moth": {
+    "title": "File:Matki.JPG",
+    "license": "CC BY-SA 3.0",
+    "artist": "Lalitstar at English Wikipedia",
+    "source": "https://commons.wikimedia.org/wiki/File:Matki.JPG",
+    "file": "qml/assets/produce/moth.jpg"
+  },
+  "mung": {
+    "title": "File:Mung beans (Vigna radiata).jpg",
+    "license": "CC BY-SA 4.0",
+    "artist": "Ivar Leidus",
+    "source": "https://commons.wikimedia.org/wiki/File:Mung_beans_(Vigna_radiata).jpg",
+    "file": "qml/assets/produce/mung.jpg"
+  },
+  "guar": {
+    "title": "File:Cluster bean for sale.JPG",
+    "license": "CC BY-SA 3.0",
+    "artist": "Surya Prakash.S.A.",
+    "source": "https://commons.wikimedia.org/wiki/File:Cluster_bean_for_sale.JPG",
+    "file": "qml/assets/produce/guar.jpg"
+  },
+  "chana": {
+    "title": "File:Chickpea pods.jpg",
+    "license": "Public domain",
+    "artist": "Eitan Ferman",
+    "source": "https://commons.wikimedia.org/wiki/File:Chickpea_pods.jpg",
+    "file": "qml/assets/produce/chana.jpg"
+  },
+  "sarson": {
+    "title": "File:Starr-150328-0647-Brassica juncea-flowers-Northwest Eastern Island-Midway Atoll (24973321300).jpg",
+    "license": "CC BY 3.0 us",
+    "artist": "Forest and Kim Starr",
+    "source": "https://commons.wikimedia.org/wiki/File:Starr-150328-0647-Brassica_juncea-flowers-Northwest_Eastern_Island-Midway_Atoll_(24973321300).jpg",
+    "file": "qml/assets/produce/sarson.jpg"
+  },
+  "palak": {
+    "title": "File:Spinazie vrouwelijke plant (Spinacia oleracea female plant).jpg",
+    "license": "CC BY-SA 3.0",
+    "artist": "Rasbak",
+    "source": "https://commons.wikimedia.org/wiki/File:Spinazie_vrouwelijke_plant_(Spinacia_oleracea_female_plant).jpg",
+    "file": "qml/assets/produce/palak.jpg"
+  },
+  "methi": {
+    "title": "File:Fenugreek leafs.JPG",
+    "license": "CC BY-SA 3.0",
+    "artist": "Malyadri",
+    "source": "https://commons.wikimedia.org/wiki/File:Fenugreek_leafs.JPG",
+    "file": "qml/assets/produce/methi.jpg"
+  },
+  "bhindi": {
+    "title": "File:Starr-090803-3592-Abelmoschus esculentus-fruit-Wailuku-Maui (24944679436).jpg",
+    "license": "CC BY 3.0 us",
+    "artist": "Forest and Kim Starr",
+    "source": "https://commons.wikimedia.org/wiki/File:Starr-090803-3592-Abelmoschus_esculentus-fruit-Wailuku-Maui_(24944679436).jpg",
+    "file": "qml/assets/produce/bhindi.jpg"
+  },
+  "lauki": {
+    "title": "File:Courge encore verte.jpg",
+    "license": "CC BY-SA 3.0",
+    "artist": "撮影者はカールおじさんです。",
+    "source": "https://commons.wikimedia.org/wiki/File:Courge_encore_verte.jpg",
+    "file": "qml/assets/produce/lauki.jpg"
+  },
+  "petha": {
+    "title": "File:Benincasa hispida-2-selvapuram-coimbatore-India.jpg",
+    "license": "CC BY-SA 4.0",
+    "artist": "Yercaud-elango",
+    "source": "https://commons.wikimedia.org/wiki/File:Benincasa_hispida-2-selvapuram-coimbatore-India.jpg",
+    "file": "qml/assets/produce/petha.jpg"
+  },
+  "tamatar": {
+    "title": "File:Starr-081031-0357-Solanum lycopersicum-fruit with raindrops-Makawao-Maui (24900304546).jpg",
+    "license": "CC BY 3.0 us",
+    "artist": "Forest and Kim Starr",
+    "source": "https://commons.wikimedia.org/wiki/File:Starr-081031-0357-Solanum_lycopersicum-fruit_with_raindrops-Makawao-Maui_(24900304546).jpg",
+    "file": "qml/assets/produce/tamatar.jpg"
+  },
+  "baingan": {
+    "title": "File:Solanum melongena fruit.jpg",
+    "license": "CC BY-SA 3.0 au",
+    "artist": "Craig Franklin",
+    "source": "https://commons.wikimedia.org/wiki/File:Solanum_melongena_fruit.jpg",
+    "file": "qml/assets/produce/baingan.jpg"
+  },
+  "gajar": {
+    "title": "File:Carrot view.jpg",
+    "license": "CC BY-SA 4.0",
+    "artist": "gausanchennai",
+    "source": "https://commons.wikimedia.org/wiki/File:Carrot_view.jpg",
+    "file": "qml/assets/produce/gajar.jpg"
+  },
+  "matar": {
+    "title": "File:Young pod of Pisum sativum (1).JPG",
+    "license": "CC BY 3.0",
+    "artist": "Chmee2",
+    "source": "https://commons.wikimedia.org/wiki/File:Young_pod_of_Pisum_sativum_(1).JPG",
+    "file": "qml/assets/produce/matar.jpg"
+  },
+  "kheera": {
+    "title": "File:Starr-091113-9706-Cucumis sativus-burpless variety fruit and plant-Olinda-Maui (24989814335).jpg",
+    "license": "CC BY 3.0 us",
+    "artist": "Forest and Kim Starr",
+    "source": "https://commons.wikimedia.org/wiki/File:Starr-091113-9706-Cucumis_sativus-burpless_variety_fruit_and_plant-Olinda-Maui_(24989814335).jpg",
+    "file": "qml/assets/produce/kheera.jpg"
+  },
+  "tarbooz": {
+    "title": "File:Starr-091122-0099-Citrullus lanatus-fruit in half-Olinda-Maui (24360436384).jpg",
+    "license": "CC BY 3.0 us",
+    "artist": "Forest and Kim Starr",
+    "source": "https://commons.wikimedia.org/wiki/File:Starr-091122-0099-Citrullus_lanatus-fruit_in_half-Olinda-Maui_(24360436384).jpg",
+    "file": "qml/assets/produce/tarbooz.jpg"
+  },
+  "kharbooja": {
+    "title": "File:Starr-080417-4149-Cucumis melo-fruit-Makawao-Maui (24789191052).jpg",
+    "license": "CC BY 3.0 us",
+    "artist": "Forest and Kim Starr",
+    "source": "https://commons.wikimedia.org/wiki/File:Starr-080417-4149-Cucumis_melo-fruit-Makawao-Maui_(24789191052).jpg",
+    "file": "qml/assets/produce/kharbooja.jpg"
+  },
+  "amla": {
+    "title": "File:Fruits de Phyllanthus emblica à Pushkar (Rajasthan) (2).jpg",
+    "license": "CC BY-SA 4.0",
+    "artist": "Ji-Elle",
+    "source": "https://commons.wikimedia.org/wiki/File:Fruits_de_Phyllanthus_emblica_%C3%A0_Pushkar_(Rajasthan)_(2).jpg",
+    "file": "qml/assets/produce/amla.jpg"
+  },
+  "ber": {
+    "title": "File:Ziziphus mauritiana fruit 2.jpg",
+    "license": "CC BY 3.0",
+    "artist": "Ethel Aardvark",
+    "source": "https://commons.wikimedia.org/wiki/File:Ziziphus_mauritiana_fruit_2.jpg",
+    "file": "qml/assets/produce/ber.jpg"
+  },
+  "amrud": {
+    "title": "File:HK food 番石榴 Psidium guajava 果實 fruit July 2024 R12S 02.jpg",
+    "license": "CC0",
+    "artist": "FourVZS 2024",
+    "source": "https://commons.wikimedia.org/wiki/File:HK_food_%E7%95%AA%E7%9F%B3%E6%A6%B4_Psidium_guajava_%E6%9E%9C%E5%AF%A6_fruit_July_2024_R12S_02.jpg",
+    "file": "qml/assets/produce/amrud.jpg"
+  },
+  "anar": {
+    "title": "File:Pomegranate variety Glavas from Blagaj (2026)-bs.jpg",
+    "license": "CC BY-SA 4.0",
+    "artist": "Bosancica by MK",
+    "source": "https://commons.wikimedia.org/wiki/File:Pomegranate_variety_Glavas_from_Blagaj_(2026)-bs.jpg",
+    "file": "qml/assets/produce/anar.jpg"
+  },
+  "nimbu": {
+    "title": "File:Unripe fruits of Citrus limon.jpg",
+    "license": "CC BY-SA 4.0",
+    "artist": "Commonists",
+    "source": "https://commons.wikimedia.org/wiki/File:Unripe_fruits_of_Citrus_limon.jpg",
+    "file": "qml/assets/produce/nimbu.jpg"
+  },
+  "aam": {
+    "title": "File:Mangifera indica fruit in India.jpg",
+    "license": "CC BY-SA 3.0",
+    "artist": "মৌচুমী",
+    "source": "https://commons.wikimedia.org/wiki/File:Mangifera_indica_fruit_in_India.jpg",
+    "file": "qml/assets/produce/aam.jpg"
+  },
+  "dhaniya": {
+    "title": "File:A scene of Coriander leaves.JPG",
+    "license": "CC BY-SA 3.0",
+    "artist": "Thamizhpparithi Maari",
+    "source": "https://commons.wikimedia.org/wiki/File:A_scene_of_Coriander_leaves.JPG",
+    "file": "qml/assets/produce/dhaniya.jpg"
+  },
+  "pudina": {
+    "title": "File:Starr-080608-7435-Mentha spicata-leaves-Water plant Sand Island-Midway Atoll (41264499822).jpg",
+    "license": "CC BY 3.0 us",
+    "artist": "Forest and Kim Starr",
+    "source": "https://commons.wikimedia.org/wiki/File:Starr-080608-7435-Mentha_spicata-leaves-Water_plant_Sand_Island-Midway_Atoll_(41264499822).jpg",
+    "file": "qml/assets/produce/pudina.jpg"
+  },
+  "moringa": {
+    "title": "File:Drumstick Tree (Moringa oleifera) 4.jpg",
+    "license": "CC BY-SA 3.0",
+    "artist": "Mokkie",
+    "source": "https://commons.wikimedia.org/wiki/File:Drumstick_Tree_(Moringa_oleifera)_4.jpg",
+    "file": "qml/assets/produce/moringa.jpg"
+  },
+  "curry_patta": {
+    "title": "File:Starr-110330-3843-Murraya koenigii-leaves-Garden of Eden Keanae-Maui (25080820325).jpg",
+    "license": "CC BY 3.0 us",
+    "artist": "Forest and Kim Starr",
+    "source": "https://commons.wikimedia.org/wiki/File:Starr-110330-3843-Murraya_koenigii-leaves-Garden_of_Eden_Keanae-Maui_(25080820325).jpg",
+    "file": "qml/assets/produce/curry_patta.jpg"
+  },
+  "microgreens": {
+    "title": "File:Sunflower microgreens 02.jpg",
+    "license": "CC BY 4.0",
+    "artist": "Pannet",
+    "source": "https://commons.wikimedia.org/wiki/File:Sunflower_microgreens_02.jpg",
+    "file": "qml/assets/produce/microgreens.jpg"
+  },
+  "rathi_cow": {
+    "title": "File:Rathi 02.JPG",
+    "license": "CC BY-SA 3.0",
+    "artist": "Pavanaja",
+    "source": "https://commons.wikimedia.org/wiki/File:Rathi_02.JPG",
+    "file": "qml/assets/produce/rathi_cow.jpg"
+  },
+  "sirohi_goat": {
+    "title": "File:Spotted Sirohi.jpg",
+    "license": "CC BY-SA 3.0",
+    "artist": "Akbarkq",
+    "source": "https://commons.wikimedia.org/wiki/File:Spotted_Sirohi.jpg",
+    "file": "qml/assets/produce/sirohi_goat.jpg"
+  },
+  "eggs": {
+    "title": "File:A Basket of Thai Chicken Eggs.jpg",
+    "license": "CC BY-SA 4.0",
+    "artist": "Peachyeung316",
+    "source": "https://commons.wikimedia.org/wiki/File:A_Basket_of_Thai_Chicken_Eggs.jpg",
+    "file": "qml/assets/produce/eggs.jpg"
+  },
+  "ghee": {
+    "title": "File:Pure Ghee-Homemade-Maharashtra.jpg",
+    "license": "CC BY-SA 4.0",
+    "artist": "Phadke09",
+    "source": "https://commons.wikimedia.org/wiki/File:Pure_Ghee-Homemade-Maharashtra.jpg",
+    "file": "qml/assets/produce/ghee.jpg"
+  },
+  "desi_hen": {
+    "title": "File:Male and female chicken sitting together.jpg",
+    "license": "CC BY-SA 2.0",
+    "artist": "Andrei Niemimäki from Turku, Finland",
+    "source": "https://commons.wikimedia.org/wiki/File:Male_and_female_chicken_sitting_together.jpg",
+    "file": "qml/assets/produce/desi_hen.jpg"
+  },
+  "khejri": {
+    "title": "File:A tree of Prosopis Cineraria in India.jpg",
+    "license": "CC BY-SA 4.0",
+    "artist": "Mulkh Singh",
+    "source": "https://commons.wikimedia.org/wiki/File:A_tree_of_Prosopis_Cineraria_in_India.jpg",
+    "file": "qml/assets/produce/khejri.jpg"
+  },
+  "ker": {
+    "title": "File:Ker (Capparis decidua) buds and flowers from Rajasthan, India.jpg",
+    "license": "CC BY 4.0",
+    "artist": "Kingshuk Mondal",
+    "source": "https://commons.wikimedia.org/wiki/File:Ker_(Capparis_decidua)_buds_and_flowers_from_Rajasthan,_India.jpg",
+    "file": "qml/assets/produce/ker.jpg"
+  },
+  "kumatiya": {
+    "title": "File:Senegalia senegal (kummat).jpg",
+    "license": "CC BY-SA 4.0",
+    "artist": "WikiPanti",
+    "source": "https://commons.wikimedia.org/wiki/File:Senegalia_senegal_(kummat).jpg",
+    "file": "qml/assets/produce/kumatiya.jpg"
+  },
+  "sangri": {
+    "title": "File:Khejti Pod.jpg",
+    "license": "CC BY-SA 3.0",
+    "artist": "LRBurdak",
+    "source": "https://commons.wikimedia.org/wiki/File:Khejti_Pod.jpg",
+    "file": "qml/assets/produce/sangri.jpg"
+  },
+  "gunda": {
+    "title": "File:Cordia-dichotoma-SF24020-3.jpg",
+    "license": "CC BY-SA 4.0",
+    "artist": "Steve Fitzgerald",
+    "source": "https://commons.wikimedia.org/wiki/File:Cordia-dichotoma-SF24020-3.jpg",
+    "file": "qml/assets/produce/gunda.jpg"
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "name": "dhun_commons",
+  "display_name": "Dhun Commons",
+  "version": "0.2.0",
+  "type": "ui_qml",
+  "interface": "universal",
+  "category": "community",
+  "description": "A three-party seasonal treasury: private multisig proposals, external DHN placement, project competition, cultivation windows and conservation covenants for Dhun's landscape, with live LEZ testnet accounts.",
+  "author": "Dhun Commons",
+  "main": "dhun_commons_plugin",
+  "view": "qml/Main.qml",
+  "icon": "src/icons/icon.png",
+  "dependencies": [
+    "lez_core",
+    "chat_module"
+  ],
+  "dependency_overrides": {
+    "chat_module": {
+      "file": "interfaces/chat_module.lidl"
+    }
+  },
+  "codegen": {
+    "rep": "src/dhun_commons.rep"
+  },
+  "nix": {
+    "packages": {
+      "build": [],
+      "runtime": []
+    },
+    "external_libraries": [],
+    "cmake": {
+      "find_packages": [],
+      "extra_sources": [],
+      "extra_include_dirs": [],
+      "extra_link_libraries": []
+    }
+  }
+}

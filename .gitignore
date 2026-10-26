@@ -1,0 +1,21 @@
+.DS_Store
+result
+result-*
+pm
+
+# Build and editor noise
+.direnv/
+*.log
+*.swp
+.qoder/
+.vscode/
+.idea/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Secrets: never commit a bot token, Maps key or local env file
+.env
+.env.*
+!.env.example
