@@ -1,6 +1,6 @@
 .pragma library
 
-var SCHEMA = 4;
+var SCHEMA = 5;
 
 function hash32(text) {
     var h = 0x811c9dc5;
@@ -114,6 +114,51 @@ function build(now) {
         conservation: 7000,
         external: 40000,
         suppliers: 0
+    };
+
+    var people = [
+        {
+            id: "person-funder",
+            name: "A. Rao",
+            role: "funder",
+            org: "Dhun Capital Circle",
+            place: "Jaipur",
+            note: "Capital steward · signs issuance and external placement",
+            joinedAt: seedNow - 120 * DAY,
+            seeded: true
+        },
+        {
+            id: "person-dhun",
+            name: "M. Singh",
+            role: "dhun",
+            org: "Dhun Field Unit",
+            place: "Chak Gulabpura",
+            note: "Site coordinator · owns the seasonal calendar",
+            joinedAt: seedNow - 150 * DAY,
+            seeded: true
+        },
+        {
+            id: "person-steward",
+            name: "K. Devi",
+            role: "steward",
+            org: "Khejri Mandal",
+            place: "Chak Gulabpura",
+            note: "Steward collective · files field evidence",
+            joinedAt: seedNow - 90 * DAY,
+            seeded: true
+        }
+    ];
+
+    var catalog = {
+        host: "dhun-commons-atecxfewqi9.qoder.website",
+        source: "Qoder Sites analytics",
+        checkedAt: "2026-10-27T13:51:51Z",
+        windowDays: 30,
+        pageViews: 6,
+        uniqueVisitors: 4,
+        coverage: "partial",
+        coverageNote: "ingestion watermark unavailable; the host reports page views, not downloads",
+        downloadsReported: false
     };
 
     var proposals = [
@@ -1350,6 +1395,10 @@ function build(now) {
             mode: "REHEARSAL"
         },
         roles: roles,
+        people: people,
+        rewards: [],
+        rewardSince: seedNow,
+        catalog: catalog,
         wallets: wallets,
         proposals: proposals,
         ledger: ledger,

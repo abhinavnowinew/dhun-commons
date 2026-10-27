@@ -10,6 +10,10 @@ Three parties hold one seasonal treasury:
 - **Dhun Field Unit** — coordinates the landscape, competes for programme awards, claims cultivation windows.
 - **Khejri Mandal (stewards)** — bids, executes field work and returns evidence.
 
+Anyone can join as a **steward** with a name and a profile: signup only ever grants the
+steward role, and the new profile shares the steward party wallet. See
+[Node, profiles and rewards](#node-profiles-and-rewards).
+
 The wallet demonstrates the full coordination loop in one place: a 2-of-3 proposal queue with decode-before-sign, external token sales, a resource market settled in DHN, competing project bids, time-boxed cultivation challenges, milestone release with a conservation covenant, an encrypted coordination room and the seasonal landscape atlas.
 
 The **Field map** adds the physical layer: an embedded satellite studio showing where
@@ -24,6 +28,12 @@ farm map, a waste-part plan for stalks, leaves, roots and peels, seasonal native
 additions, and a guarded pantry of preserves over 20 days with a guest memorabilia
 label. The planner is deterministic and offline; a free local vision model is optional
 and restricted to loopback. See [docs/KITCHEN.md](docs/KITCHEN.md).
+
+The **Node & rewards** tab reports the Logos Messaging node and LEZ sequencer exactly as
+they report themselves, records a node day while the messaging node is ready, explains
+every way to earn DHN, and queues payouts as 2-of-3 treasury proposals. It also shows
+what the catalog host actually measures (page views and unique visitors) instead of an
+invented install count. See [Node, profiles and rewards](#node-profiles-and-rewards).
 
 ## What this build is
 
@@ -177,7 +187,45 @@ returned; the card read **node online · 0 peers** and a message was accepted by
 `send_message` ("1 submitted"). No second peer was present, so no message has been
 peer-delivered and the app does not claim it has.
 
+## Node, profiles and rewards
+
+**Node & rewards** is a first-class tab. It does not invent a node or a user base:
+
+- **Logos Messaging node** — shows the state, delivery preset, address, conversation
+  count, submitted and received counts, and the peer count that `chat_module` actually
+  reports. One peer is this device; the page says so until a second peer appears.
+- **LEZ sequencer** — shows the network, block height, sequencer URL and the created /
+  funded account counts read from the local wallet. Heights and balances are
+  sequencer-reported, not finality.
+- **Who is actually here** — the public catalog snapshot stores what the host returns:
+  unique visitors, page views and a check time from Qoder Sites analytics. The host does
+  not report downloads, so no install count is shown. Wallet holders are the LEZ party
+  accounts this device holds; profiles are names stored locally, not separate wallets.
+
+**Steward signup.** Anyone can create a profile with a name, a place and a note. New
+profiles always receive the **steward** role; the funder and Dhun identities stay
+seeded rehearsal parties. Profiles persist in the module's `QtCore.Settings` on this
+device, share the steward party wallet, and are removed by **About → Reset rehearsal**.
+
+**How DHN is earned.** Five verifiable actions accrue reward entries to the active
+profile. Nothing is minted and nothing moves at accrual time:
+
+| Action | Reward | Evidence |
+|---|---|---|
+| Run the Logos node | 25 DHN / day | Logged once per device per calendar day while the node reports ready and Basecamp is open |
+| Complete field work | 8 DHN / task | A field-calendar task is marked done; reopening it cancels the unclaimed entry |
+| File challenge evidence | 15 DHN / challenge | Evidence text is filed on a claimed cultivation window |
+| File a kitchen plan | 5 DHN / day | A valid plan with sourcing, waste uses and a shelf-life route; one filing per day |
+| Onboard a steward | 10 DHN / profile | A person creates a steward profile on this device |
+
+A payout is a normal `reward` proposal: it moves DHN from the multisig vault to the
+steward wallet and needs two of three signatures. The ledger marks it *treasury funded,
+not minted*; total supply is unchanged. Payment credits the shared steward wallet, not
+an individual key, because a profile has no key of its own.
+
 ## Telegram relay
+
+
 
 `telegram/` is a zero-dependency Node service that bridges Telegram and this installation.
 It long-polls the Bot API (no webhook), reads the public sequencer directly, and exchanges
@@ -252,7 +300,7 @@ scripts/              local studio server and catalog generator/validator
 catalog/              published catalog files, once a release is hosted
 telegram/             Telegram bridge: Bot API long poll, relay files, 8 tests
 docs/                 RFP proposal, field map, kitchen, publishing and demo notes
-tests/Flow.qml        headless 101-check flow harness
+tests/Flow.qml        headless 121-check flow harness
 .github/workflows/    CI: bridge tests, manifest and catalog checks, secret guard
 ```
 
@@ -288,17 +336,20 @@ LGX, attach it to a public release (or static host), generate `logos-repo.json` 
 
 ### Public catalog
 
-The 0.3.2 catalog is live at
+The 0.4.0 catalog is live at
 **https://dhun-commons-atecxfewqi9.qoder.website/logos-repo.json** (public, unsigned).
 Add that URL in Basecamp → Settings → Repositories. The same host serves
-`index.json`, the icon and the 11 MB `.lgx`. The 0.3.2 build routes the local
-vision-model request through the module backend — and returns the finished reply
-from that slot, because the sandbox blocks network access from plugin QML.
+`index.json`, the icon and the 11 MB `.lgx`. The 0.4.0 build adds the **Node &
+rewards** tab, steward profiles created with a name, reward entries for node uptime
+and filed work, and the Wallet-over-map fix. The local vision-model request still
+returns the finished reply from the backend slot, because the sandbox blocks network
+access from plugin QML.
 
 Verified on 2026-10-27 with unauthenticated HTTPS requests: the descriptor and index
-returned JSON, the icon matched its SHA-256, and the downloaded `.lgx` was
-11,076,009 bytes with SHA-256
-`a97178143b10a6cdc2a6fe364e1c0c921a56541e16b3ec39f34c0f892751aadc`.
+returned version 0.4.0, the icon matched its SHA-256, and the downloaded `.lgx` was
+11,090,766 bytes with SHA-256
+`4f0133f0fd0f6b70e9db67cddd16d980c22cc6d6528a466b180ad3b48dd54c9f` (root hash
+`c79b607e0ac7619d642cc2cf83cd42eed576ce223fb00e43b39c5ab5ea7a32c0`).
 
 This is static catalog hosting only. It does not publish the source repository; the
 working tree still has no git remote.

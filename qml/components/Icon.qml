@@ -225,6 +225,20 @@ Canvas {
             circle(cx, cy, s * 0.38);
             line(cx, s * 0.44, cx, s * 0.68);
             dot(cx, s * 0.32, 1.2);
+        } else if (name === "node") {
+            circle(cx, s * 0.28, s * 0.1);
+            circle(s * 0.26, s * 0.72, s * 0.1);
+            circle(s * 0.74, s * 0.72, s * 0.1);
+            line(cx, s * 0.38, s * 0.32, s * 0.63);
+            line(cx, s * 0.38, s * 0.68, s * 0.63);
+            line(s * 0.36, s * 0.72, s * 0.64, s * 0.72);
+        } else if (name === "user") {
+            circle(cx, s * 0.34, s * 0.16);
+            ctx.beginPath();
+            ctx.moveTo(s * 0.2, s * 0.86);
+            ctx.quadraticCurveTo(s * 0.24, s * 0.6, cx, s * 0.6);
+            ctx.quadraticCurveTo(s * 0.76, s * 0.6, s * 0.8, s * 0.86);
+            ctx.stroke();
         }
     }
 }

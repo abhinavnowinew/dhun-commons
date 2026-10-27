@@ -6,6 +6,7 @@ Item {
 
     property url studioUrl
     property bool started: false
+    property bool pageActive: true
     property bool loaded: false
     property bool failed: false
     property bool available: false
@@ -35,10 +36,22 @@ Item {
         reload();
     }
 
+    onPageActiveChanged: {
+        if (pageActive) return;
+        loaded = false;
+        failed = false;
+        failureText = "";
+        progress = 0;
+        pageTitle = "";
+    }
+
     Loader {
         id: loader
         anchors.fill: parent
-        active: root.started
+        // macOS QtWebView paints into a native view that escapes QML stacking.
+        // Destroying it when the page leaves the screen keeps it from covering
+        // the wallet and the other pages.
+        active: root.started && root.pageActive
         source: "StudioWebViewImpl.qml"
 
         onStatusChanged: {
@@ -59,7 +72,6 @@ Item {
     Connections {
         target: loader.item
         ignoreUnknownSignals: true
-
         function onPageLoaded() {
             root.loaded = true;
             root.failed = false;

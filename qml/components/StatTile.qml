@@ -11,7 +11,7 @@ Rectangle {
     property color accent: Theme.limeDeep
     property string glyph: ""
 
-    implicitHeight: 112
+    implicitHeight: 124
     radius: Theme.radiusLarge
     color: Theme.white
     border.width: 1
@@ -19,16 +19,16 @@ Rectangle {
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 15
-        spacing: 4
+        anchors.margins: 17
+        spacing: 5
 
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
 
             Rectangle {
-                width: 5
-                height: 5
+                width: 6
+                height: 6
                 radius: 3
                 color: tile.accent
             }
@@ -37,7 +37,7 @@ Rectangle {
                 text: tile.label
                 color: Theme.muted
                 font.pixelSize: 8
-                font.letterSpacing: 1.1
+                font.letterSpacing: 1.3
                 font.weight: Font.DemiBold
                 Layout.fillWidth: true
                 elide: Text.ElideRight
@@ -56,7 +56,7 @@ Rectangle {
             text: tile.value
             color: Theme.ink
             font.family: Theme.displayFont
-            font.pixelSize: 26
+            font.pixelSize: 31
             elide: Text.ElideRight
         }
 

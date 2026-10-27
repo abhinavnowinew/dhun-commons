@@ -9,6 +9,7 @@ var PROPOSAL_KIND_LABEL = {
     challenge_release: "Release challenge",
     purchase: "Purchase resource",
     allocate: "Allocate challenge",
+    reward: "Reward payout",
     config: "Change policy"
 };
 
@@ -547,6 +548,8 @@ function instructionText(state, proposal) {
         return "purchase(offer=" + (meta.offerId || "—") + ", qty=" + (meta.qty || 0) + ", amount=" + proposal.amount + ")";
     if (proposal.kind === "allocate")
         return "allocate_challenge(zone=" + (meta.zone || "—") + ", bounty=" + proposal.amount + ", window=" + (meta.windowHours || 0) + "h)";
+    if (proposal.kind === "reward")
+        return "pay_rewards(profile=" + (meta.profileId || "—") + ", entries=" + ((meta.rewardIds || []).length) + ", amount=" + proposal.amount + ")";
     if (proposal.kind === "config")
         return "set_policy(" + (meta.policy || "—") + ", value=" + (meta.value || "—") + ")";
     return proposal.kind;

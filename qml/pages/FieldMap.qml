@@ -653,6 +653,7 @@ Item {
                     id: studioWebView
                     anchors.fill: parent
                     started: page.studioRequested && page.webEnabled
+                    pageActive: page.visible
                     visible: page.webEnabled && !studioWebView.failed
                     onPageLoaded: page.callStudio("snapshot", [])
                 }

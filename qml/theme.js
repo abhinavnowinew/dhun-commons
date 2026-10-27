@@ -1,20 +1,20 @@
 .pragma library
 
-var paper = "#F4F1E7";
-var paperDeep = "#EAE5D7";
-var paperWarm = "#F7F2E7";
-var white = "#FCFAF3";
-var forest = "#11251B";
-var forestSoft = "#1C3627";
-var forestMid = "#2B4D38";
-var ink = "#1B2A21";
-var inkSoft = "#3C4B40";
-var muted = "#6D7B70";
-var mutedLight = "#98A298";
-var line = "#D9DFD2";
-var lineSoft = "#E7EAE1";
-var sage = "#DDE5D2";
-var sageLight = "#EDF1E4";
+var paper = "#F1EDE0";
+var paperDeep = "#E4DECC";
+var paperWarm = "#F6F1E4";
+var white = "#FFFDF6";
+var forest = "#0E2118";
+var forestSoft = "#183425";
+var forestMid = "#2A5039";
+var ink = "#15231A";
+var inkSoft = "#35443A";
+var muted = "#63736A";
+var mutedLight = "#8F9B91";
+var line = "#D2DAC7";
+var lineSoft = "#E3E7DA";
+var sage = "#D8E1CB";
+var sageLight = "#EAF0DF";
 var lime = "#D9EF92";
 var limeDeep = "#B9D567";
 var gold = "#E0B25C";
@@ -34,11 +34,11 @@ var monoFont = "Menlo";
 
 var radiusSmall = 8;
 var radiusMedium = 12;
-var radiusLarge = 18;
-var radiusXL = 24;
-var pagePadding = 30;
-var sidebarWidth = 238;
-var topBarHeight = 78;
+var radiusLarge = 20;
+var radiusXL = 26;
+var pagePadding = 36;
+var sidebarWidth = 252;
+var topBarHeight = 88;
 
 function roleColor(role) {
     if (role === "funder") return gold;

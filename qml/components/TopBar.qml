@@ -9,10 +9,12 @@ Item {
     property string subtitle: ""
     property string section: ""
     property string activeRole: "funder"
+    property var activePerson: null
     property real walletBalance: 0
     property int pendingCount: 0
 
     signal roleSelected(string role)
+    signal profileRequested()
 
     implicitHeight: Theme.topBarHeight
 
@@ -69,7 +71,7 @@ Item {
                 text: topBar.title
                 color: Theme.ink
                 font.family: Theme.displayFont
-                font.pixelSize: 24
+                font.pixelSize: 30
                 font.weight: Font.Normal
                 elide: Text.ElideRight
                 Layout.fillWidth: true
@@ -79,7 +81,7 @@ Item {
                 text: topBar.subtitle
                 color: Theme.muted
                 font.family: Theme.uiFont
-                font.pixelSize: 10
+                font.pixelSize: 11
                 elide: Text.ElideRight
                 Layout.fillWidth: true
             }
@@ -127,13 +129,36 @@ Item {
         ColumnLayout {
             spacing: 5
 
-            Text {
-                text: "SIGNING AS"
-                color: Theme.muted
-                font.family: Theme.uiFont
-                font.pixelSize: 7
-                font.letterSpacing: 1.4
-                font.weight: Font.DemiBold
+            RowLayout {
+                spacing: 5
+
+                Text {
+                    id: signInLabel
+                    text: topBar.activePerson
+                          ? ("SIGNING AS · " + topBar.activePerson.name.toUpperCase())
+                          : "SIGNING AS"
+                    color: signMouse.containsMouse ? Theme.forestMid : Theme.muted
+                    font.family: Theme.uiFont
+                    font.pixelSize: 7
+                    font.letterSpacing: 1.4
+                    font.weight: Font.DemiBold
+
+                    MouseArea {
+                        id: signMouse
+                        anchors.fill: parent
+                        anchors.margins: -4
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: topBar.profileRequested()
+                    }
+                }
+
+                Icon {
+                    name: "user"
+                    color: signMouse.containsMouse ? Theme.forestMid : Theme.mutedLight
+                    width: 9
+                    height: 9
+                }
             }
 
             Rectangle {
@@ -179,7 +204,9 @@ Item {
 
                                     Text {
                                         anchors.centerIn: parent
-                                        text: roleButton.modelData.initial
+                                        text: (topBar.activePerson && topBar.activePerson.role === roleButton.modelData.key)
+                                              ? topBar.activePerson.name.substring(0, 1).toUpperCase()
+                                              : roleButton.modelData.initial
                                         color: Theme.roleText(roleButton.modelData.key)
                                         font.family: Theme.uiFont
                                         font.pixelSize: 7

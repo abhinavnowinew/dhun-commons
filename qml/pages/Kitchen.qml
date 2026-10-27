@@ -202,7 +202,7 @@ Item {
                     text: "Menu → farm → pantry"
                     color: Theme.ink
                     font.family: Theme.displayFont
-                    font.pixelSize: 19
+                    font.pixelSize: 26
                 }
 
                 Text {
@@ -220,6 +220,14 @@ Item {
                     bg: Theme.sageLight
                     dotColor: Theme.limeDeep
                     fontSize: 8
+                }
+
+                ActionButton {
+                    compact: true
+                    variant: "lime"
+                    text: "File plan · +5 DHN"
+                    enabled: page.plan !== null && page.plan.ok && page.host !== null
+                    onClicked: page.host.fileKitchenPlan(page.plan)
                 }
             }
 

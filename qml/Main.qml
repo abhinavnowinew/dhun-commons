@@ -5,6 +5,7 @@ import QtCore
 import "theme.js" as Theme
 import "logic.js" as Logic
 import "seed.js" as Seed
+import "rewards.js" as Rewards
 import "components"
 import "pages"
 import "drawers"
@@ -22,6 +23,8 @@ Item {
     property real now: Date.now()
     property string activePage: "overview"
     property string activeRole: "funder"
+    property string activePersonId: "person-funder"
+    property bool profileOpen: false
     property string roomChannel: "room-msig"
 
     property var activeProposal: null
@@ -50,7 +53,14 @@ Item {
     property string toastText: ""
     property string toastTone: "ok"
 
-    readonly property var pageOrder: ["overview", "field", "kitchen", "market", "projects", "challenges", "wallet", "room", "landscape"]
+    readonly property var activePerson: personById(activePersonId)
+    readonly property var people: state && state.people ? state.people : []
+    readonly property int profileCount: people.length
+    readonly property int stewardProfileCount: people.filter(function (person) { return person.role === "steward"; }).length
+    readonly property int pendingRewardCount: state ? Rewards.pendingCount(state) : 0
+    readonly property var catalog: state && state.catalog ? state.catalog : null
+
+    readonly property var pageOrder: ["overview", "field", "kitchen", "market", "projects", "challenges", "wallet", "node", "room", "landscape"]
     readonly property var pageMeta: ({
         overview: {
             title: "Overview",
@@ -85,6 +95,11 @@ Item {
         wallet: {
             title: "Wallet",
             subtitle: "Your role, the multisig queue, token backing and the ledger",
+            section: "Treasury"
+        },
+        node: {
+            title: "Node & rewards",
+            subtitle: "The node that is actually running, the accounts on this device and how DHN is earned",
             section: "Treasury"
         },
         room: {
@@ -127,6 +142,7 @@ Item {
         property string stateJson: ""
         property string page: "overview"
         property string role: "funder"
+        property string person: "person-funder"
         property string room: "room-msig"
     }
 
@@ -139,6 +155,8 @@ Item {
                 state = Seed.build(Date.now());
             }
             if (state.roles[settings.role]) activeRole = settings.role;
+            if (personById(settings.person)) activePersonId = settings.person;
+            else if (personForRole(activeRole)) activePersonId = personForRole(activeRole).id;
             if (pageOrder.indexOf(settings.page) !== -1) activePage = settings.page;
             if (state.messages[settings.room]) roomChannel = settings.room;
         }
@@ -151,6 +169,7 @@ Item {
         if (persistState) settings.role = activeRole;
         fieldPage.setStudioRole(activeRole);
     }
+    onActivePersonIdChanged: if (persistState) settings.person = activePersonId
     onRoomChannelChanged: if (persistState) settings.room = roomChannel
 
     Timer {
@@ -179,6 +198,22 @@ Item {
         repeat: true
         running: app.relayReady
         onTriggered: app.pollRelayInbox()
+    }
+
+    // A node day is only recorded while the Logos Messaging node reports
+    // ready inside Basecamp. Without a node there is nothing to reward.
+    Timer {
+        interval: 60000
+        repeat: true
+        running: app.relayHosted && roomPage !== null && roomPage.chatReady
+        onTriggered: app.noteNodeDay()
+    }
+
+    Connections {
+        target: roomPage
+        function onChatReadyChanged() {
+            if (roomPage.chatReady) app.noteNodeDay();
+        }
     }
 
     Connections {
@@ -322,9 +357,78 @@ Item {
         return createdId;
     }
 
+    function personById(id) {
+        if (!state || !state.people) return null;
+        for (var i = 0; i < state.people.length; ++i)
+            if (state.people[i].id === id) return state.people[i];
+        return null;
+    }
+
+    function personForRole(roleId) {
+        if (!state || !state.people) return null;
+        var current = personById(activePersonId);
+        if (current && current.role === roleId) return current;
+        for (var i = state.people.length - 1; i >= 0; --i)
+            if (state.people[i].role === roleId) return state.people[i];
+        return null;
+    }
+
+    function profileIdForRole(roleId) {
+        var person = personForRole(roleId);
+        return person ? person.id : "";
+    }
+
+    function selectPerson(id) {
+        var person = personById(id);
+        if (!person) return;
+        activePersonId = person.id;
+        if (activeRole !== person.role) activeRole = person.role;
+        profileOpen = false;
+        showToast("Signing as " + person.name + " · " + state.roles[person.role].short);
+    }
+
+    function addPerson(spec) {
+        var name = String(spec && spec.name ? spec.name : "").trim();
+        if (name.length < 2) {
+            showToast("Add a name of at least two characters.", "error");
+            return null;
+        }
+        var created = null;
+        mutate(function (next) {
+            var id = "person-" + Date.now().toString(36);
+            var existing = {};
+            for (var i = 0; i < next.people.length; ++i) existing[next.people[i].id] = true;
+            while (existing[id]) id += "x";
+            var person = {
+                id: id,
+                name: name,
+                role: "steward",
+                org: "Khejri Mandal · steward",
+                place: String(spec.place || "").trim(),
+                note: String(spec.note || "").trim(),
+                joinedAt: Date.now(),
+                seeded: false
+            };
+            next.people.push(person);
+            addReward(next, "steward-onboarding", "steward", id, "profile|" + id,
+                name + " joined as a steward");
+            systemMessage(next, "room-msig",
+                "Steward signup · " + name + " created a profile on this device · steward role only.");
+            created = person;
+        });
+        if (!created) return null;
+        activePersonId = created.id;
+        if (activeRole !== "steward") activeRole = "steward";
+        now = Date.now();
+        showToast("Welcome, " + created.name + " · steward profile saved on this device");
+        return created;
+    }
+
     function setRole(roleId) {
         if (!state.roles[roleId] || roleId === activeRole) return;
         activeRole = roleId;
+        var person = personForRole(roleId);
+        if (person) activePersonId = person.id;
         showToast("Signing as " + state.roles[roleId].org);
     }
 
@@ -348,6 +452,7 @@ Item {
         activeProject = null;
         activeChallenge = null;
         aboutOpen = false;
+        profileOpen = false;
     }
 
     function closeTop() {
@@ -357,6 +462,7 @@ Item {
         else if (allocateOpen) allocateOpen = false;
         else if (activeChallenge) activeChallenge = null;
         else if (activeProject) activeProject = null;
+        else if (profileOpen) profileOpen = false;
         else if (aboutOpen) aboutOpen = false;
     }
 
@@ -380,6 +486,115 @@ Item {
             if (!isNaN(value) && value > max) max = value;
         }
         return "FLD-" + ("000" + (max + 1)).slice(-3);
+    }
+
+    function nextRewardId(next) {
+        var max = 0;
+        for (var i = 0; i < next.rewards.length; ++i) {
+            var value = parseInt(String(next.rewards[i].id).replace("RWD-", ""), 10);
+            if (!isNaN(value) && value > max) max = value;
+        }
+        return "RWD-" + ("0000" + (max + 1)).slice(-4);
+    }
+
+    function addReward(next, ruleId, roleId, profileId, ref, note) {
+        if (!next.rewards) next.rewards = [];
+        if (Rewards.hasRef(next, ref)) return null;
+        var rule = Rewards.rule(ruleId);
+        if (!rule) return null;
+        if (!profileId) {
+            var fallback = personForRole(roleId);
+            profileId = fallback ? fallback.id : "";
+        }
+        var entry = {
+            id: nextRewardId(next),
+            rule: rule.id,
+            label: rule.label,
+            amount: Number(rule.amount),
+            role: roleId,
+            profileId: profileId,
+            ref: ref,
+            note: note || "",
+            earnedAt: Date.now(),
+            status: "earned"
+        };
+        next.rewards.push(entry);
+        return entry;
+    }
+
+    function revokeReward(next, ref) {
+        if (!next.rewards) return;
+        for (var i = 0; i < next.rewards.length; ++i) {
+            if (next.rewards[i].ref !== ref) continue;
+            if (next.rewards[i].status === "earned") next.rewards[i].status = "cancelled";
+        }
+    }
+
+    function noteNodeDay() {
+        if (!roomPage || !roomPage.chatReady) return;
+        var person = activePerson;
+        if (!person) return;
+        var key = "node|" + Rewards.dateKey(Date.now());
+        if (Rewards.hasRef(state, key)) return;
+        mutate(function (next) {
+            addReward(next, "node-day", person.role, person.id, key,
+                "Logos Messaging node ready on " + Rewards.dateKey(Date.now()));
+        });
+        showToast("Node day logged · " + Rewards.amountFor("node-day") + " DHN queued for " + person.name);
+    }
+
+    function fileKitchenPlan(plan) {
+        if (!plan || !plan.ok) {
+            showToast("Build a valid kitchen plan before filing it.", "error");
+            return false;
+        }
+        var person = activePerson;
+        if (!person) return false;
+        var key = "kitchen|" + Rewards.dateKey(Date.now());
+        if (Rewards.hasRef(state, key)) {
+            showToast("A kitchen plan is already filed today.", "error");
+            return false;
+        }
+        mutate(function (next) {
+            addReward(next, "kitchen-plan", person.role, person.id, key,
+                plan.totals.lines + " sourced lines · " + plan.totals.coverage + "% covered");
+        });
+        showToast("Kitchen plan filed · " + Rewards.amountFor("kitchen-plan") + " DHN queued");
+        return true;
+    }
+
+    function proposeRewardPayout(profileId) {
+        var person = personById(profileId);
+        if (!person) return;
+        var list = Rewards.earnedForProfile(state, profileId);
+        if (!list.length) {
+            showToast(person.name + " has no unclaimed rewards.", "error");
+            return;
+        }
+        var amount = Rewards.total(list);
+        var ids = [];
+        for (var i = 0; i < list.length; ++i) ids.push(list[i].id);
+        var rows = Rewards.byRule(list);
+        var parts = [];
+        for (var r = 0; r < rows.length; ++r) parts.push(rows[r].label + " ×" + rows[r].count);
+        createProposal({
+            kind: "reward",
+            title: "Pay " + person.name + " · " + amount + " DHN",
+            summary: "Earned rewards: " + parts.join(", ") +
+                     ". Paid from the treasury to the " + state.roles[person.role].short.toLowerCase() +
+                     " wallet. The profile record is local to this device; 2-of-3 signatures are still required.",
+            amount: amount,
+            from: "vault",
+            to: person.role,
+            target: "dhun_multisig::reward",
+            meta: {
+                profileId: person.id,
+                profileName: person.name,
+                rewardIds: ids,
+                rules: rows
+            }
+        });
+        showToast("Reward payout proposed · needs a second signature");
     }
 
     function fieldUpdateText(activity, next, verb) {
@@ -473,6 +688,7 @@ Item {
         if (!id) return;
         var label = "";
         var wanted = status === "done" ? "done" : "planned";
+        var rewardNote = "";
         mutate(function (next) {
             for (var i = 0; i < next.fieldActivities.length; ++i) {
                 var activity = next.fieldActivities[i];
@@ -480,6 +696,13 @@ Item {
                 activity.status = wanted;
                 activity.completedAt = wanted === "done" ? Date.now() : 0;
                 label = activity.title;
+                if (wanted === "done") {
+                    var earned = addReward(next, "field-task", activity.role, profileIdForRole(activity.role),
+                        "field|" + activity.id, activity.title);
+                    if (earned) rewardNote = " · " + earned.amount + " DHN queued";
+                } else {
+                    revokeReward(next, "field|" + activity.id);
+                }
                 systemMessage(next, "room-msig",
                     "Field calendar · " + (wanted === "done" ? "Completed" : "Reopened") +
                     " · " + activity.title + " · " + (next.roles[activity.role] ? next.roles[activity.role].org : activity.role) + ".");
@@ -488,7 +711,7 @@ Item {
         if (label.length === 0) return;
         now = Date.now();
         fieldPage.pushStatus(id, wanted);
-        showToast(wanted === "done" ? "Marked done · " + label : "Reopened · " + label);
+        showToast((wanted === "done" ? "Marked done · " + label + rewardNote : "Reopened · " + label));
     }
 
     function openFieldOffer(offer) {
@@ -636,6 +859,14 @@ Item {
             if (!offer) return "Market offer not found";
             if (Number(offer.stock) < Number(proposal.meta.qty || 1)) return "Offer stock no longer covers the order";
         }
+        if (proposal.kind === "reward") {
+            var rewardIds = proposal.meta.rewardIds || [];
+            var remaining = 0;
+            for (var r = 0; r < rewardIds.length; ++r)
+                for (var q = 0; q < state.rewards.length; ++q)
+                    if (state.rewards[q].id === rewardIds[r] && state.rewards[q].status === "earned") remaining += 1;
+            if (remaining === 0) return "These reward entries were already paid";
+        }
         return "";
     }
 
@@ -756,6 +987,26 @@ Item {
                     (purchased ? (qty + " × " + purchased.unit + " · " + purchased.supplier) : "Market settlement") +
                     (purchaseCovenant > 0 ? " · " + Logic.formatNumber(purchaseCovenant) + " covenant" : ""),
                     amount, target.from, "suppliers", tx, target.id);
+            } else if (target.kind === "reward") {
+                next.wallets.vault -= amount;
+                next.wallets[target.to] += amount;
+                var rewardIds = target.meta.rewardIds || [];
+                var paidCount = 0;
+                for (var ri = 0; ri < next.rewards.length; ++ri) {
+                    for (var rj = 0; rj < rewardIds.length; ++rj) {
+                        if (next.rewards[ri].id !== rewardIds[rj] || next.rewards[ri].status !== "earned") continue;
+                        next.rewards[ri].status = "paid";
+                        next.rewards[ri].paidAt = Date.now();
+                        next.rewards[ri].proposalId = target.id;
+                        paidCount += 1;
+                    }
+                }
+                pushLedger(next, "reward", "Reward payout",
+                    (target.meta.profileName || target.to) + " · " + paidCount + " entries · treasury funded, not minted",
+                    amount, "vault", target.to, tx, target.id);
+                systemMessage(next, "room-msig",
+                    (target.meta.profileName || target.to) + " paid " + Logic.formatNumber(amount) +
+                    " DHN in rewards · " + target.id + " executed · tx " + Logic.shortHash(tx) + ".");
             } else if (target.kind === "allocate") {
                 var allocateProject = Logic.findProject(next, target.meta.projectId);
                 var maxChallenge = 0;
@@ -975,11 +1226,13 @@ Item {
             var target = Logic.findChallenge(next, challenge.id);
             if (!target) return;
             target.evidence = text;
+            addReward(next, "challenge-evidence", activeRole, activePersonId,
+                "challenge|" + target.id, target.title);
             systemMessage(next, target.room,
                 target.title + " evidence filed by " + next.roles[activeRole].org + " · release now needs 2 signatures.");
         });
         activeChallenge = Logic.findChallenge(state, challenge.id);
-        showToast("Evidence filed · propose the release next");
+        showToast("Evidence filed · " + Rewards.amountFor("challenge-evidence") + " DHN queued · propose the release next");
     }
 
     function proposeChallengeRelease(challenge) {
@@ -1258,7 +1511,7 @@ Item {
 
         return {
             app: "dhun_commons",
-            version: "0.2.0",
+            version: "0.4.0",
             page: activePage,
             role: activeRole,
             room: "room-msig",
@@ -1358,8 +1611,11 @@ Item {
         activeProject = null;
         activeChallenge = null;
         aboutOpen = false;
+        profileOpen = false;
         purchaseInitialQty = 1;
         seenStudioUpdates = ({});
+        activePersonId = "person-funder";
+        activeRole = "funder";
         fieldPage.resetStudio();
         roomChannel = "room-msig";
         if (persistState) settings.stateJson = "";
@@ -1380,6 +1636,9 @@ Item {
             Layout.preferredWidth: Theme.sidebarWidth
             currentPage: app.activePage
             activeRole: app.activeRole
+            activePerson: app.activePerson
+            profileCount: app.profileCount
+            pendingRewards: app.pendingRewardCount
             pendingCount: app.pendingCount
             openChallengeCount: app.openChallengeCount
             fieldTodayCount: app.fieldTodayCount
@@ -1388,6 +1647,7 @@ Item {
             walletBalance: app.state.wallets[app.activeRole]
             onNavigate: function (page) { app.navigate(page) }
             onOpenAbout: app.aboutOpen = true
+            onOpenProfile: app.profileOpen = true
         }
 
         ColumnLayout {
@@ -1401,9 +1661,11 @@ Item {
                 subtitle: app.meta.subtitle
                 section: app.meta.section
                 activeRole: app.activeRole
+                activePerson: app.activePerson
                 walletBalance: app.state.wallets[app.activeRole]
                 pendingCount: app.pendingCount
                 onRoleSelected: function (role) { app.setRole(role) }
+                onProfileRequested: app.profileOpen = true
             }
 
             StackLayout {
@@ -1415,11 +1677,19 @@ Item {
                     app: app.state
                     now: app.now
                     activeRole: app.activeRole
+                    activePerson: app.activePerson
+                    catalog: app.catalog
+                    profileCount: app.profileCount
+                    stewardProfileCount: app.stewardProfileCount
+                    pendingRewardCount: app.pendingRewardCount
+                    nodeReady: roomPage.chatReady
+                    nodeState: roomPage.chatState
                     onOpenProposal: function (proposal) { app.activeProposal = proposal }
                     onOpenOffer: function (offer) { app.openOffer(offer) }
                     onOpenChallenge: function (challenge) { app.openChallenge(challenge) }
                     onOpenProject: function (project) { app.openProject(project) }
                     onNavigate: function (page) { app.navigate(page) }
+                    onJoinAsSteward: app.profileOpen = true
                 }
 
                 FieldMap {
@@ -1473,6 +1743,7 @@ Item {
                 }
 
                 Wallet {
+                    id: walletPage
                     app: app.state
                     now: app.now
                     activeRole: app.activeRole
@@ -1481,6 +1752,38 @@ Item {
                     onOpenMint: app.openMint()
                     onAllocate: app.openAllocate("PRJ-01")
                     onNavigate: function (page) { app.navigate(page) }
+                }
+
+                Node {
+                    app: app.state
+                    now: app.now
+                    activeRole: app.activeRole
+                    activePerson: app.activePerson
+                    catalog: app.catalog
+                    profileCount: app.profileCount
+                    stewardProfileCount: app.stewardProfileCount
+                    pendingRewardCount: app.pendingRewardCount
+                    nodeHosted: roomPage.logosHosted
+                    nodeReady: roomPage.chatReady
+                    nodeState: roomPage.chatState
+                    nodeDelivery: roomPage.chatDelivery
+                    nodeAddress: roomPage.chatAddress
+                    nodeError: roomPage.chatError
+                    nodeLine: roomPage.chatLine
+                    nodePeers: roomPage.chatPeers
+                    nodeInbound: roomPage.chatInbound
+                    nodeMirrored: roomPage.chatMirrored
+                    nodeConvos: roomPage.chatConvos
+                    chainHosted: walletPage.chainHosted
+                    chainReady: walletPage.chainReady
+                    chainStatus: walletPage.chainStatus
+                    chainHeight: walletPage.chainHeight
+                    chainNetwork: walletPage.chainNetwork
+                    chainSequencer: walletPage.chainSequencer
+                    chainAccounts: walletPage.chainAccounts
+                    onNavigate: function (pageKey) { app.navigate(pageKey) }
+                    onOpenProfile: app.profileOpen = true
+                    onProposePayout: function (profileId) { app.proposeRewardPayout(profileId) }
                 }
 
                 Room {
@@ -1600,6 +1903,24 @@ Item {
         onReject: app.rejectActive()
         onExecute: app.executeActive()
         onOpenRoom: function (roomId) { app.goRoom(roomId) }
+    }
+
+    ProfileDrawer {
+        id: profileDrawer
+        anchors.fill: parent
+        z: 135
+        app: app.state
+        open: app.profileOpen
+        activePersonId: app.activePersonId
+        onClose: app.profileOpen = false
+        onCreateProfile: function (name, place, note) {
+            if (app.addPerson({ name: name, place: place, note: note })) app.profileOpen = false;
+        }
+        onSelectProfile: function (id) { app.selectPerson(id) }
+        onOpenRewards: {
+            app.profileOpen = false;
+            app.navigate("node");
+        }
     }
 
     AboutDrawer {

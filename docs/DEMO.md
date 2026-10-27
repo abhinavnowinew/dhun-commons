@@ -291,6 +291,43 @@ Open **Kitchen**. The page loads the rabi sample: 24 guests, December, six dishe
    against a loopback OpenAI-compatible vision server; without one the built-in planner
    reads the typed lines and no model is called. See [KITCHEN.md](KITCHEN.md).
 
+### 10. Node, steward signup and rewards
+
+Open **Node & rewards**. The hero reports the live host state twice: Logos Messaging on
+the left and the LEZ sequencer on the right. Outside Basecamp both read **NOT HOSTED**
+or **LEZ UNINITIALIZED**; the page never substitutes a placeholder for a ready node.
+
+1. Read the **Logos Messaging node** card. *Delivery* mirrors the module's chat state,
+   *Peers* mirrors its peer count and *Route address* is only filled once the node
+   issues one. One peer is this device; delivery to a second peer is never claimed.
+2. Read the **LEZ sequencer** card. Network, endpoint, height and the three party
+   accounts come from `lez_core`. Wallet accounts belong to Funder, Dhun and Steward,
+   not to each profile; steward profiles share the steward wallet until a payout lands.
+3. Read **Who is actually here**. Unique visitors and page views are the Qoder Sites
+   analytics for this catalog over the last 30 days, with the checked timestamp. The
+   host does not report downloads or installs, so the page prints that instead of an
+   invented install count. Wallet holders are the funded LEZ accounts on this device;
+   profiles are local names.
+4. Press **Join as a steward** (or the sidebar chip, or **Create your profile** on the
+   hero). Enter a name of at least two characters, a place and an optional note. The
+   drawer creates a profile with the **steward** role, signs the top bar as that person
+   and writes a 10 DHN onboarding reward entry. Profiles are local settings, not chain
+   accounts, and reset removes them. Funder and Dhun remain seeded rehearsal roles; a
+   new signup never receives either.
+5. Read **How to earn DHN**. Each rule states its evidence and daily cap: a ready node
+   day (25, once per device per calendar day), a filed field task (8), a challenge with
+   evidence attached (15), a filed kitchen plan (5, once per day) and a new steward
+   profile (10, once). **Go** routes to the page that produces the evidence.
+6. On **Earned on this device**, choose **Propose payout** for a profile. The entry
+   becomes a treasury proposal from the vault to the steward wallet for the earned
+   total. It still needs two of three signatures, and execution moves existing DHN —
+   the ledger line reads *treasury funded, not minted* and supply is unchanged.
+
+Node-day credit requires the Logos Messaging node to report ready; the page records one
+day per device while it stays ready and stops when the app closes. It is evidence of a
+local node, not proof of a second peer or of chain finality.
+
+
 ## What is real in this build
 
 - The LEZ testnet account panel: wallet creation on device, a locally produced recovery
@@ -300,6 +337,15 @@ Open **Kitchen**. The page loads the rabi sample: 24 guests, December, six dishe
 - The full QML interface, navigation and local persistence (`QtCore.Settings`).
 - The proposal state machine: pending, ready, timelocked display, executed, rejected,
   expired (the seeds include ready and pending proposals).
+- Reward entries for a ready node day, a filed field task, challenge evidence, a filed
+  kitchen plan and a steward signup. They are earned locally, paid only through a
+  treasury reward proposal, and execution moves existing DHN without changing supply.
+- Steward profiles created with a name, stored in this module's settings and signed in
+  the top bar. They are local identities with the steward role; they are not chain
+  accounts and do not receive owner keys.
+- The catalog analytics shown on Overview and Node & rewards: Qoder Sites reports page
+  views and unique visitors only. Downloads and installs are not reported, so no install
+  count is shown. Wallet holders are the funded LEZ accounts on this device.
 - Role-specific allowances (Funder 0, Dhun 500, Steward 500), approval collection and
   the 2-of-3 quorum.
 - Escrow accounting, market stock, purchase covenant split, challenge bounty split,
@@ -356,9 +402,10 @@ and field records stay local.
 
 ## Automated checks
 
-The in-repo flow harness exercises 101 assertions across all proposal kinds, roles,
+The in-repo flow harness exercises 121 assertions across all proposal kinds, roles,
 escrows, covenants, supply conservation, the native field page, field orders, the
-studio bridge events, the Telegram relay queue and the kitchen planner:
+studio bridge events, the Telegram relay queue, the kitchen planner, node-day rewards,
+steward signup and reward payouts:
 
 ```sh
 export QML2_IMPORT_PATH=/Applications/LogosBasecamp.app/Contents/Resources/qt/qml
@@ -373,7 +420,7 @@ export QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software
 Expected final line:
 
 ```text
-qml: SUMMARY checks=101 failures=0 supply=170000 issued=170000
+qml: SUMMARY checks=121 failures=0 supply=170000 issued=170000
 ```
 
 The 170,000 supply is correct: the harness executes the 20,000 DHN Tranche C mint,
@@ -439,18 +486,20 @@ satellite studio is therefore checked live in Basecamp, not by this harness.
 | `qml/Main.qml` | Application conductor, proposal execution and economy |
 | `qml/seed.js` | Deterministic rehearsal state |
 | `qml/logic.js` | Proposal/escrow/covenant/formatting logic |
-| `qml/pages/` | Overview, Field map, Kitchen, Market, Projects, Challenges, Wallet, Room, Landscape |
+| `qml/pages/` | Overview, Field map, Kitchen, Market, Projects, Challenges, Wallet, Node & rewards, Room, Landscape |
 | `qml/pages/FieldMap.qml` | Embedded studio host, bridge, native plan view and field calendar |
 | `qml/pages/Kitchen.qml` | Menu photo, model client, sourcing, waste/native cards, safety gate, pantry label |
+| `qml/pages/Node.qml` | Node and LEZ status, catalog counts, reward rules and payout queue |
 | `qml/kitchen.js` | Dish library, per-head planner, waste and native data, preserves and safety rules |
+| `qml/rewards.js` | Reward rules, profiles and earned totals |
 | `qml/web/` | Bundled field studio (Maps, activities, clips, procurement) |
 | `qml/components/StudioWebView.qml` | Guarded QtWebView host with native fallback |
-| `qml/drawers/` | Proposal, purchase, treasury, allocation, project, challenge, about |
+| `qml/drawers/` | Proposal, purchase, treasury, allocation, project, challenge, profile, about |
 | `src/dhun_commons.rep` | Universal module interface: wallet, refresh, transfer, verify and photo-read slots |
 | `src/dhun_commons_backend.{h,cpp}` | LEZ wallet directory, account mapping, balances, transfers, local photo reader |
 | `metadata.json`, `CMakeLists.txt` | Universal module metadata, `lez_core` dependency and build |
 | `scripts/make-catalog.mjs` | Generates and validates the public Basecamp catalog files |
-| `tests/Flow.qml` | 101-check headless flow harness |
+| `tests/Flow.qml` | 121-check headless flow harness |
 | `docs/FIELD-MAP.md` | Maps key setup, studio architecture, data limits and camera caveat |
 | `docs/KITCHEN.md` | Kitchen workflow, free local vision models, safety rules and limits |
 | `docs/PUBLISHING.md` | Catalog schema, release hosting and Basecamp repository setup |

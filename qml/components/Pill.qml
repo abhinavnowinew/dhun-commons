@@ -15,7 +15,7 @@ Rectangle {
     property bool strong: false
     property bool mono: false
 
-    implicitHeight: 22
+    implicitHeight: 24
     implicitWidth: pillRow.implicitWidth + horizontalPadding * 2
     radius: height / 2
     color: bg

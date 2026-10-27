@@ -7,6 +7,9 @@ Rectangle {
 
     property string currentPage: "overview"
     property string activeRole: "funder"
+    property var activePerson: null
+    property int profileCount: 0
+    property int pendingRewards: 0
     property int pendingCount: 0
     property int openChallengeCount: 0
     property int fieldTodayCount: 0
@@ -17,6 +20,7 @@ Rectangle {
 
     signal navigate(string page)
     signal openAbout()
+    signal openProfile()
 
     color: Theme.forest
     implicitWidth: Theme.sidebarWidth
@@ -29,6 +33,7 @@ Rectangle {
         { key: "projects", label: "Projects", icon: "projects", badge: "" },
         { key: "challenges", label: "Challenges", icon: "challenges", badge: "" },
         { key: "wallet", label: "Wallet", icon: "wallet", badge: "" },
+        { key: "node", label: "Node & rewards", icon: "node", badge: "" },
         { key: "room", label: "Coordination room", icon: "room", badge: "" },
         { key: "landscape", label: "Landscape", icon: "landscape", badge: "" }
     ]
@@ -47,17 +52,17 @@ Rectangle {
             spacing: 11
 
             Rectangle {
-                width: 34
-                height: 34
-                radius: 10
+                width: 38
+                height: 38
+                radius: 11
                 color: Theme.lime
 
                 Icon {
                     anchors.centerIn: parent
                     name: "leaf"
                     color: Theme.forest
-                    width: 17
-                    height: 17
+                    width: 19
+                    height: 19
                     strokeWidth: 1.7
                 }
             }
@@ -68,7 +73,7 @@ Rectangle {
                     text: "Dhun"
                     color: "#F7F4E8"
                     font.family: Theme.displayFont
-                    font.pixelSize: 23
+                    font.pixelSize: 27
                     font.weight: Font.Normal
                 }
                 Text {
@@ -76,7 +81,7 @@ Rectangle {
                     color: "#8FA795"
                     font.family: Theme.uiFont
                     font.pixelSize: 8
-                    font.letterSpacing: 1.6
+                    font.letterSpacing: 1.8
                 }
             }
 
@@ -181,14 +186,15 @@ Rectangle {
                         if (modelData.key === "wallet" || modelData.key === "overview") return sidebar.pendingCount > 0 ? String(sidebar.pendingCount) : "";
                         if (modelData.key === "challenges") return sidebar.openChallengeCount > 0 ? String(sidebar.openChallengeCount) : "";
                         if (modelData.key === "field") return sidebar.fieldTodayCount > 0 ? String(sidebar.fieldTodayCount) : "";
+                        if (modelData.key === "node") return sidebar.pendingRewards > 0 ? String(sidebar.pendingRewards) : "";
                         if (modelData.key === "room") return sidebar.roomUnread > 0 ? String(sidebar.roomUnread) : "";
                         return "";
                     }
 
                     Layout.fillWidth: true
-                    height: 38
-                    radius: 9
-                    color: active ? "#23402C" : (navMouse.containsMouse ? "#1B3425" : "transparent")
+                    height: 40
+                    radius: 10
+                    color: active ? "#25452F" : (navMouse.containsMouse ? "#1B3425" : "transparent")
 
                     Rectangle {
                         visible: navRow.active
@@ -219,7 +225,7 @@ Rectangle {
                             text: navRow.modelData.label
                             color: navRow.active ? "#F4F7E9" : "#B9C9B9"
                             font.family: Theme.uiFont
-                            font.pixelSize: 12
+                            font.pixelSize: 13
                             font.weight: navRow.active ? Font.DemiBold : Font.Normal
                             elide: Text.ElideRight
                         }
@@ -270,17 +276,18 @@ Rectangle {
             spacing: 8
 
             Rectangle {
-                width: 26
-                height: 26
-                radius: 13
+                width: 30
+                height: 30
+                radius: 15
                 color: Theme.roleSoft(sidebar.activeRole)
 
                 Text {
                     anchors.centerIn: parent
-                    text: sidebar.activeRole === "dhun" ? "M" : (sidebar.activeRole === "steward" ? "K" : "A")
+                    text: sidebar.activePerson ? sidebar.activePerson.name.substring(0, 1).toUpperCase()
+                                               : (sidebar.activeRole === "dhun" ? "M" : (sidebar.activeRole === "steward" ? "K" : "A"))
                     color: Theme.roleText(sidebar.activeRole)
                     font.family: Theme.uiFont
-                    font.pixelSize: 11
+                    font.pixelSize: 12
                     font.weight: Font.Bold
                 }
             }
@@ -289,17 +296,21 @@ Rectangle {
                 Layout.fillWidth: true
                 spacing: 0
                 Text {
-                    text: format.roleName(sidebar.activeRole)
+                    Layout.fillWidth: true
+                    text: sidebar.activePerson ? sidebar.activePerson.name : format.roleName(sidebar.activeRole)
                     color: "#E8EFDC"
                     font.family: Theme.uiFont
-                    font.pixelSize: 11
+                    font.pixelSize: 12
                     font.weight: Font.DemiBold
+                    elide: Text.ElideRight
                 }
                 Text {
-                    text: format.number(sidebar.walletBalance) + " DHN available"
+                    Layout.fillWidth: true
+                    text: format.roleName(sidebar.activeRole) + " · " + format.number(sidebar.walletBalance) + " DHN"
                     color: "#8FA795"
                     font.family: Theme.uiFont
-                    font.pixelSize: 9
+                    font.pixelSize: 8
+                    elide: Text.ElideRight
                 }
             }
 
@@ -327,8 +338,57 @@ Rectangle {
             }
         }
 
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.topMargin: 9
+            Layout.preferredHeight: 32
+            radius: 9
+            color: profileMouse.containsMouse ? "#284433" : "transparent"
+            border.width: 1
+            border.color: profileMouse.containsMouse ? "#3C5C43" : "#2C4734"
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 10
+                anchors.rightMargin: 8
+                spacing: 7
+
+                Icon {
+                    name: "user"
+                    color: Theme.lime
+                    width: 13
+                    height: 13
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    text: sidebar.activePerson && sidebar.activePerson.role === "steward" ? "Your steward profile" : "Join as a steward"
+                    color: "#D6E2CA"
+                    font.family: Theme.uiFont
+                    font.pixelSize: 9
+                    font.weight: Font.DemiBold
+                    elide: Text.ElideRight
+                }
+
+                Text {
+                    text: sidebar.profileCount + " profiles"
+                    color: "#7C9483"
+                    font.family: Theme.uiFont
+                    font.pixelSize: 8
+                }
+            }
+
+            MouseArea {
+                id: profileMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: sidebar.openProfile()
+            }
+        }
+
         Text {
-            Layout.topMargin: 10
+            Layout.topMargin: 8
             Layout.leftMargin: 4
             text: "Rehearsal · local state, no chain"
             color: "#6E8577"

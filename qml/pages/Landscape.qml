@@ -58,7 +58,7 @@ Item {
                     text: "Landscape ledger"
                     color: Theme.ink
                     font.family: Theme.displayFont
-                    font.pixelSize: 19
+                    font.pixelSize: 24
                 }
 
                 Text {

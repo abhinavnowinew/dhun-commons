@@ -12,7 +12,7 @@ Button {
     property int hPadding: 15
     property bool compact: false
 
-    implicitHeight: compact ? 30 : 38
+    implicitHeight: compact ? 31 : 40
     implicitWidth: buttonRow.implicitWidth + hPadding * 2
     hoverEnabled: true
     enabled: true

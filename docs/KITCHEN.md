@@ -257,7 +257,7 @@ The pantry is deliberately conservative.
 ## Tests
 
 ```sh
-# 101 wallet, field, relay and kitchen checks
+# 121 wallet, field, relay, kitchen and reward checks
 QML2_IMPORT_PATH=/Applications/LogosBasecamp.app/Contents/Resources/qt/qml \
 QT_PLUGIN_PATH=/Applications/LogosBasecamp.app/Contents/Resources/qt/plugins \
 QT_QPA_PLATFORM_PLUGIN_PATH=$QT_PLUGIN_PATH/platforms \

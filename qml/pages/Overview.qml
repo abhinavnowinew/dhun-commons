@@ -11,17 +11,29 @@ Item {
     property var app: null
     property var now: Date.now()
     property string activeRole: "funder"
+    property var activePerson: null
+    property var catalog: null
+    property int profileCount: 0
+    property int stewardProfileCount: 0
+    property int pendingRewardCount: 0
+    property bool nodeReady: false
+    property string nodeState: "UNAVAILABLE"
 
     signal openProposal(var proposal)
     signal openOffer(var offer)
     signal openChallenge(var challenge)
     signal openProject(var project)
     signal navigate(string pageKey)
+    signal joinAsSteward()
 
     readonly property var pending: app ? Logic.pendingProposals(app, now) : []
     readonly property var activeProjectList: app ? Logic.activeProjects(app) : []
     readonly property var featuredOffer: app && app.offers.length ? app.offers[0] : null
     readonly property var nextChallenge: app ? Logic.nextChallenge(app, now) : null
+    readonly property string catalogChecked: {
+        if (!catalog || !catalog.checkedAt) return "";
+        return String(catalog.checkedAt).replace("T", " ").replace("Z", " UTC");
+    }
 
     Flickable {
         id: scroller
@@ -41,7 +53,7 @@ Item {
 
             Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 196
+                Layout.preferredHeight: 248
                 radius: Theme.radiusXL
                 color: Theme.forest
                 clip: true
@@ -50,7 +62,7 @@ Item {
                     anchors.fill: parent
                     source: "../assets/dhun-satellite.jpg"
                     fillMode: Image.PreserveAspectCrop
-                    opacity: 0.4
+                    opacity: 0.42
                     visible: status === Image.Ready
                 }
 
@@ -117,8 +129,8 @@ Item {
                             text: "The commons is\nsolvent and in season."
                             color: "#F5F3E6"
                             font.family: Theme.displayFont
-                            font.pixelSize: 29
-                            lineHeight: 1.04
+                            font.pixelSize: 38
+                            lineHeight: 1.02
                         }
 
                         Text {
@@ -130,6 +142,32 @@ Item {
                             lineHeight: 1.4
                             wrapMode: Text.WordWrap
                             maximumLineCount: 2
+                        }
+
+                        RowLayout {
+                            Layout.topMargin: 4
+                            spacing: 8
+
+                            ActionButton {
+                                compact: true
+                                variant: "lime"
+                                text: "Earn DHN"
+                                onClicked: page.navigate("node")
+                            }
+                            ActionButton {
+                                compact: true
+                                variant: "gold"
+                                text: page.activePerson ? ("Signing as " + page.activePerson.name) : "Join as a steward"
+                                onClicked: page.joinAsSteward()
+                            }
+                            Text {
+                                text: page.nodeReady ? "LOGOS NODE READY" : page.nodeState
+                                color: page.nodeReady ? Theme.lime : "#C7A36A"
+                                font.family: Theme.monoFont
+                                font.pixelSize: 7
+                                font.letterSpacing: 0.8
+                                Layout.leftMargin: 4
+                            }
                         }
                     }
 
@@ -253,10 +291,131 @@ Item {
 
                 StatTile {
                     Layout.fillWidth: true
-                    label: "EXTERNAL HOLDERS"
+                    label: "EXTERNAL HOLDINGS"
                     value: app ? Logic.formatNumber(app.wallets.external) : ""
                     caption: app ? ("₹" + Logic.formatNumber(app.token.fiatRaised / 100000) + "k raised") : ""
                     accent: Theme.clay
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 96
+                radius: Theme.radiusLarge
+                color: "#18301F"
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 20
+                    anchors.rightMargin: 20
+                    spacing: 22
+
+                    ColumnLayout {
+                        Layout.preferredWidth: 210
+                        spacing: 3
+
+                        RowLayout {
+                            spacing: 6
+                            Rectangle {
+                                width: 6
+                                height: 6
+                                radius: 3
+                                color: page.nodeReady ? Theme.lime : Theme.gold
+                            }
+                            Text {
+                                text: "COMMONS SIGNAL"
+                                color: "#DDE9C9"
+                                font.family: Theme.uiFont
+                                font.pixelSize: 8
+                                font.letterSpacing: 1.5
+                                font.weight: Font.DemiBold
+                            }
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: page.catalogChecked.length
+                                  ? "Catalog host checked " + page.catalogChecked
+                                  : "No catalog snapshot stored"
+                            color: "#7E9583"
+                            font.family: Theme.monoFont
+                            font.pixelSize: 7
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: "downloads not reported"
+                            color: "#7E9583"
+                            font.family: Theme.uiFont
+                            font.pixelSize: 7
+                        }
+                    }
+
+                    Rectangle { width: 1; height: 54; color: "#2C4634" }
+
+                    Repeater {
+                        model: [
+                            { label: "UNIQUE VISITORS", value: page.catalog ? String(page.catalog.uniqueVisitors) : "—", unit: "Qoder Sites" },
+                            { label: "PAGE VIEWS", value: page.catalog ? String(page.catalog.pageViews) : "—", unit: "last 30 days" },
+                            { label: "PROFILES", value: String(page.profileCount), unit: page.stewardProfileCount + " steward" },
+                            { label: "REWARDS QUEUED", value: String(page.pendingRewardCount), unit: "entries" }
+                        ]
+
+                        delegate: ColumnLayout {
+                            required property var modelData
+                            Layout.fillWidth: true
+                            spacing: 1
+
+                            Text {
+                                text: modelData.label
+                                color: "#8FA795"
+                                font.family: Theme.uiFont
+                                font.pixelSize: 6
+                                font.letterSpacing: 1.2
+                                font.weight: Font.DemiBold
+                            }
+                            Text {
+                                text: modelData.value
+                                color: "#F4F7E9"
+                                font.family: Theme.displayFont
+                                font.pixelSize: 24
+                            }
+                            Text {
+                                text: modelData.unit
+                                color: "#7E9583"
+                                font.family: Theme.uiFont
+                                font.pixelSize: 7
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        implicitWidth: signalAction.implicitWidth + 24
+                        implicitHeight: 30
+                        radius: 9
+                        color: signalMouse.containsMouse ? Theme.lime : "transparent"
+                        border.width: 1
+                        border.color: signalMouse.containsMouse ? Theme.lime : "#3C5C43"
+
+                        Text {
+                            id: signalAction
+                            anchors.centerIn: parent
+                            text: "Node & rewards →"
+                            color: signalMouse.containsMouse ? Theme.forest : "#D6E2CA"
+                            font.family: Theme.uiFont
+                            font.pixelSize: 9
+                            font.weight: Font.DemiBold
+                        }
+
+                        MouseArea {
+                            id: signalMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: page.navigate("node")
+                        }
+                    }
                 }
             }
 
@@ -277,7 +436,7 @@ Item {
                             text: "Needs a signature"
                             color: Theme.ink
                             font.family: Theme.displayFont
-                            font.pixelSize: 19
+                            font.pixelSize: 24
                         }
 
                         Item { Layout.fillWidth: true }
@@ -576,7 +735,7 @@ Item {
                     text: "Live programmes"
                     color: Theme.ink
                     font.family: Theme.displayFont
-                    font.pixelSize: 19
+                    font.pixelSize: 24
                 }
 
                 Item { Layout.fillWidth: true }

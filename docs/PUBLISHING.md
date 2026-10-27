@@ -15,15 +15,17 @@ This repository follows it exactly: descriptor `schemaVersion` 1, index
 `schemaVersion` 2, `rootHash` copied from `manifest.hashes.root`, and the
 `signature` key omitted for unsigned builds.
 
-> **Status.** The 0.3.2 catalog is published publicly at
+> **Status.** The 0.4.0 catalog is published publicly at
 > **https://dhun-commons-atecxfewqi9.qoder.website/logos-repo.json** and wired
 > into the local Basecamp package downloader at
 > `module_data/package_downloader/3a9e34c93f16/repositories.json`. The descriptor,
 > index, icon and `.lgx` were fetched back over unauthenticated HTTPS; the `.lgx`
-> matched the index SHA-256 exactly (11,076,009 bytes,
-> `a97178143b10a6cdc2a6fe364e1c0c921a56541e16b3ec39f34c0f892751aadc`). The index
-> lists 0.3.2 only; 0.3.1 posted the model request but its tab never saw the
-> stored reply, so 0.3.2 returns the finished result from the slot. The source
+> matched the index SHA-256 exactly (11,090,766 bytes,
+> `4f0133f0fd0f6b70e9db67cddd16d980c22cc6d6528a466b180ad3b48dd54c9f`, root
+> `c79b607e0ac7619d642cc2cf83cd42eed576ce223fb00e43b39c5ab5ea7a32c0`). The index
+> lists 0.4.0 only. This build adds the Node & rewards page, steward profiles,
+> node-day and filed-work reward entries and the Wallet-over-map fix; the local
+> vision request still returns the finished reply from the backend slot. The source
 > repository still has no git remote. `dist/public` holds the published files and
 > is gitignored.
 >
@@ -38,7 +40,7 @@ This repository follows it exactly: descriptor `schemaVersion` 1, index
 Edit `metadata.json`:
 
 ```json
-"version": "0.3.2"
+"version": "0.4.0"
 ```
 
 Basecamp 0.2.3 installs a **portable** variant. Do not publish the `-dev`
@@ -54,28 +56,28 @@ NIX_CONFIG="experimental-features = nix-command flakes" nix build .#lgx-portable
 The artifact is a single `.lgx` file under `result/`. Rename it for release:
 
 ```sh
-cp result/logos-dhun_commons-module.lgx dist/dhun_commons-0.3.2.lgx
+cp result/logos-dhun_commons-module.lgx dist/dhun_commons-0.4.0.lgx
 ```
 
 ## 3. Create the GitHub release
 
 Create a public repository for the project (for example
-`OWNER/dhun-commons`) and a release tagged `dhun_commons-v0.3.2`. Attach
-`dhun_commons-0.3.2.lgx` as the release asset.
+`OWNER/dhun-commons`) and a release tagged `dhun_commons-v0.4.0`. Attach
+`dhun_commons-0.4.0.lgx` as the release asset.
 
 The asset URL becomes:
 
 ```text
-https://github.com/OWNER/dhun-commons/releases/download/dhun_commons-v0.3.2/dhun_commons-0.3.2.lgx
+https://github.com/OWNER/dhun-commons/releases/download/dhun_commons-v0.4.0/dhun_commons-0.4.0.lgx
 ```
 
 ## 4. Generate the catalog
 
 ```sh
 node scripts/make-catalog.mjs \
-  --lgx dist/dhun_commons-0.3.2.lgx \
+  --lgx dist/dhun_commons-0.4.0.lgx \
   --github OWNER/dhun-commons \
-  --release-tag dhun_commons-v0.3.2 \
+  --release-tag dhun_commons-v0.4.0 \
   --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   --out catalog
 ```
@@ -93,8 +95,8 @@ descriptor and index. Override them for GitHub Pages or another host:
 
 ```sh
 node scripts/make-catalog.mjs \
-  --lgx dist/dhun_commons-0.3.2.lgx \
-  --url https://cdn.example.org/dhun/dhun_commons-0.3.2.lgx \
+  --lgx dist/dhun_commons-0.4.0.lgx \
+  --url https://cdn.example.org/dhun/dhun_commons-0.4.0.lgx \
   --index-url https://cdn.example.org/dhun/index.json \
   --out catalog
 ```
@@ -111,7 +113,7 @@ same `rootHash` are replaced, so a rebuild is idempotent.
 ```sh
 node scripts/make-catalog.mjs --check catalog
 git add catalog/index.json catalog/logos-repo.json catalog/icons
-git commit -m "Publish Dhun Commons 0.3.2 catalog"
+git commit -m "Publish Dhun Commons 0.4.0 catalog"
 git push origin main
 ```
 

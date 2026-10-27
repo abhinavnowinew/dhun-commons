@@ -328,7 +328,7 @@ Item {
                                 text: page.app ? Logic.formatNumber(page.app.wallets[page.activeRole]) : ""
                                 color: "#F6F4E8"
                                 font.family: Theme.displayFont
-                                font.pixelSize: 38
+                                font.pixelSize: 46
                             }
                             Text {
                                 text: "DHN"
@@ -472,7 +472,7 @@ Item {
                         text: page.app ? ("₹" + Logic.formatNumber(page.app.token.fiatReserve)) : ""
                         color: Theme.ink
                         font.family: Theme.displayFont
-                        font.pixelSize: 25
+                        font.pixelSize: 29
                     }
 
                     Text {
@@ -571,7 +571,7 @@ Item {
                         text: "On-chain accounts"
                         color: Theme.ink
                         font.family: Theme.displayFont
-                        font.pixelSize: 19
+                        font.pixelSize: 22
                     }
                     Pill {
                         text: "LEZ PUBLIC TESTNET"
@@ -1022,7 +1022,7 @@ Item {
                             text: "Open proposals"
                             color: Theme.ink
                             font.family: Theme.displayFont
-                            font.pixelSize: 19
+                            font.pixelSize: 22
                         }
                         Text {
                             Layout.leftMargin: 7
@@ -1073,7 +1073,7 @@ Item {
                             text: "Treasury ledger"
                             color: Theme.ink
                             font.family: Theme.displayFont
-                            font.pixelSize: 19
+                            font.pixelSize: 22
                         }
                         Item { Layout.fillWidth: true }
                         Text {

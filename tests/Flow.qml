@@ -370,6 +370,50 @@ Window {
         check("remote model endpoints are refused", !Kitchen.localEndpointAllowed("https://api.example.com/v1") && !Kitchen.localEndpointAllowed("http://10.0.0.5:11434/v1"));
         check("model URL joins the chat path", Kitchen.chatCompletionsUrl("http://127.0.0.1:11434/v1") === "http://127.0.0.1:11434/v1/chat/completions");
 
+        // 14. Node page, steward signup and reward payout
+        app.navigate("node");
+        check("node tab is registered", app.pageOrder.indexOf("node") !== -1 && app.activePage === "node", app.activePage);
+        check("node tab has page metadata", app.pageMeta.node && app.pageMeta.node.title === "Node & rewards", app.pageMeta.node ? app.pageMeta.node.title : "missing");
+        check("catalog snapshot reports no download count", app.catalog && app.catalog.downloadsReported === false && app.catalog.host.length > 0, app.catalog ? app.catalog.host : "missing");
+        check("catalog snapshot keeps a real read time", app.catalog && app.catalog.checkedAt.length > 0, app.catalog ? app.catalog.checkedAt : "missing");
+        var fieldReward = null;
+        for (var rw = 0; rw < app.state.rewards.length; ++rw)
+            if (app.state.rewards[rw].ref === "field|FLD-013") fieldReward = app.state.rewards[rw];
+        check("completing field work queues a reward", fieldReward !== null && fieldReward.amount === 8 && fieldReward.status === "earned", fieldReward ? fieldReward.amount : "missing");
+        check("accrued rewards moved no money", walletSum(app) === app.state.token.issued, walletSum(app));
+
+        var people0 = app.state.people.length;
+        var steward = app.addPerson({ name: "Meera Rathore", place: "Barmer", note: "Nursery beds" });
+        check("steward signup creates a profile", steward !== null && steward.role === "steward", steward ? steward.role : "null");
+        check("signup adds one profile to the device", app.state.people.length === people0 + 1, app.state.people.length);
+        check("signup signs the new steward in", app.activeRole === "steward" && app.activePersonId === steward.id, app.activeRole);
+        var onboarded = null;
+        for (var rw2 = 0; rw2 < app.state.rewards.length; ++rw2)
+            if (app.state.rewards[rw2].rule === "steward-onboarding" && app.state.rewards[rw2].profileId === steward.id) onboarded = app.state.rewards[rw2];
+        check("signup queues the onboarding reward", onboarded !== null && onboarded.amount === 10, onboarded ? onboarded.amount : "missing");
+        check("signup minted nothing", walletSum(app) === app.state.token.issued, walletSum(app));
+        check("nameless signup is refused", app.addPerson({ name: " " }) === null && app.state.people.length === people0 + 1, app.state.people.length);
+        check("seeded people keep their party roles", app.state.people[0].role === "funder" && app.state.people[1].role === "dhun" && app.state.people[2].role === "steward");
+
+        var vault0b = app.state.wallets.vault;
+        var steward0 = app.state.wallets.steward;
+        app.proposeRewardPayout(steward.id);
+        var payout = app.activeProposal;
+        check("payout proposal is queued", payout !== null && payout.kind === "reward" && payout.meta.profileId === steward.id, payout ? payout.kind : "null");
+        check("payout proposal sums unclaimed rewards", payout !== null && payout.amount === 10, payout ? payout.amount : "missing");
+        signWith(app, "funder", payout.id);
+        app.setRole("steward");
+        app.activeProposal = app.proposalById(payout.id);
+        app.executeActive();
+        check("payout executed", app.proposalById(payout.id).status === "executed", app.proposalById(payout.id).status);
+        check("payout paid from the treasury", app.state.wallets.vault === vault0b - 10, app.state.wallets.vault);
+        check("payout credits the steward wallet", app.state.wallets.steward === steward0 + 10, app.state.wallets.steward);
+        check("payout preserves supply", walletSum(app) === app.state.token.issued, walletSum(app));
+        var paidEntries = 0;
+        for (var rw3 = 0; rw3 < app.state.rewards.length; ++rw3)
+            if (app.state.rewards[rw3].proposalId === payout.id && app.state.rewards[rw3].status === "paid") paidEntries += 1;
+        check("paid entries carry the payout proposal", paidEntries === 1, paidEntries);
+
         console.log("SUMMARY checks=" + win.checks + " failures=" + win.failures + " supply=" + walletSum(app) + " issued=" + app.state.token.issued);
         finishTimer.start();
     }
