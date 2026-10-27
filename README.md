@@ -283,10 +283,23 @@ gh repo create dhun-commons --private --source . --remote origin --push
 Basecamp apps are discovered through a module **catalog**, not a central store. The
 catalog generator and validator are in `scripts/make-catalog.mjs`; the full release
 steps are in [docs/PUBLISHING.md](docs/PUBLISHING.md). In short: build the portable
-LGX, attach it to a public GitHub release, generate `catalog/logos-repo.json` and
-`catalog/index.json`, commit them, then add the raw descriptor URL in Basecamp
-Settings → Repositories. Nothing has been pushed or published from this machine, so
-there is no public catalog URL yet.
+LGX, attach it to a public release (or static host), generate `logos-repo.json` and
+`index.json`, then add the raw descriptor URL in Basecamp Settings → Repositories.
+
+### Public catalog
+
+The 0.3.0 catalog is live at
+**https://dhun-commons-atecxfewqi9.qoder.website/logos-repo.json** (public, unsigned).
+Add that URL in Basecamp → Settings → Repositories. The same host serves
+`index.json`, the icon and the 11 MB `.lgx`.
+
+Verified on 2026-10-27 with unauthenticated HTTPS requests: the descriptor and index
+returned JSON, the icon matched its SHA-256, and the downloaded `.lgx` was
+11,065,234 bytes with SHA-256
+`4dc397f9bdf4474c353b995567c38bf7576d60c99f3ee2f8301b338933d18fa1`.
+
+This is static catalog hosting only. It does not publish the source repository; the
+working tree still has no git remote.
 
 CI runs on every push: bridge tests, the manifest/catalog checks and the secret guard.
 The guard fails the build if a Telegram token pattern, a Google Maps key pattern, or a

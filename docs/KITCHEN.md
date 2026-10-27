@@ -67,35 +67,91 @@ Pressing **Read photo**:
 
 The endpoint must be `127.0.0.1`, `localhost` or `[::1]`. The QML client refuses
 any other host before opening a request. The default is
-`http://127.0.0.1:11434/v1` with model `qwen2.5vl:7b`.
+`http://127.0.0.1:11434/v1` with model `qwen2.5vl:3b`, the build this machine has
+installed and the one tested below; the model field is editable, and
+`qwen2.5vl:7b` reads denser menus more reliably if you have the memory for it.
 
 ### Free models verified for this task
 
 Licences below were checked against the Hugging Face model API on 2026-10-27.
-No model is bundled, installed or claimed to be running by this repository.
+This repository bundles no model. Qwen2.5-VL 3B was installed and run locally
+for the check in the next section; no other model here has been run by us.
 
 | Model | Hugging Face ID | Licence | Notes |
 |---|---|---|---|
-| Qwen2.5-VL 7B Instruct | `Qwen/Qwen2.5-VL-7B-Instruct` | Apache-2.0 | Strong document and scene-text reading; recommended default |
+| Qwen2.5-VL 7B Instruct | `Qwen/Qwen2.5-VL-7B-Instruct` | Apache-2.0 | Strong document and scene-text reading; better accuracy when memory allows |
 | LLaVA-OneVision Qwen2 7B | `llava-hf/llava-onevision-qwen2-7b-ov-hf` | Apache-2.0 | General vision, good menu/whiteboard reading |
 | Moondream 2 | `vikhyatk/moondream2` | Apache-2.0 | Very small; faster on CPU, weaker on dense handwriting |
 | InternVL 2.5 8B | `OpenGVLab/InternVL2_5-8B` | MIT | Strong OCR; heavier setup |
 | Florence-2 large | `microsoft/Florence-2-large` | MIT | OCR/region tasks; not a chat model, needs a wrapper |
 
-Models that returned no licence tag in the API response (for example some
-Qwen2.5-VL 3B and MiniCPM-V repositories) are deliberately not listed.
+The table lists repositories whose Hub API response carried a licence on
+2026-10-27. Some Qwen2.5-VL 3B and MiniCPM-V entries returned no licence tag in
+that check, so they are not in the table; confirm the licence on the model card
+of the exact tag you pull before redistributing a model.
+
+### Verified local run, 2026-10-27
+
+One real model-assisted pass was run on this machine: `qwen2.5vl:3b` on Ollama
+0.40.7 at `http://127.0.0.1:11434`, reading `qml/assets/menu-sample.jpg` at
+temperature 0. The 7B build was the intended default but its download was
+interrupted by a network/DNS failure, so the smaller 3B build was used.
+
+The model returned in 15.5 s (1,806 prompt tokens, 76 completion tokens):
+
+````text
+```json
+{
+  "dishes": [
+    "Bajra Roti",
+    "Moth Dal",
+    "Sarson Saag",
+    "Gajar Halwa",
+    "Kheera Raita",
+    "Nimbu Pani"
+  ],
+  "servings": null,
+  "notes": ["unreadable"]
+}
+```
+````
+
+That reply is a useful stress case, because it is wrapped in markdown fences and
+because it contradicts itself: every dish name is correct, yet `notes` says
+`unreadable` and `servings` is null. The app's reply parser strips the fences,
+matched all six lines against the dish library (6 of 6, no unmatched lines) and
+ignored the stray note. Because the model gave no guest count, the plan was
+built with 24 guests entered by hand — exactly what the Kitchen tab asks the
+cook to do.
+
+The planner output from that transcribed menu:
+
+| Result | Value |
+|---|---|
+| Sourcing lines | 11 across Farms & Market Garden, Dairy & Poultry, Orchards & Groves, Kitchen Garden |
+| Cost | ₹3,483 total (₹481 Market, ₹3,002 plot estimate) |
+| Coverage | 5 of 11 covered by seeded Market stock; 6 plot estimates |
+| Waste routes | 10 ingredients, 20 parts (stalks, roots, peels, tops, bran, whey, soaking water, husks, zest, seeds, stems) |
+| Native additions | Moringa leaves, sangri (khejri pod), ker buds |
+| Preserves >20 days | 9 routes listed; 3 cooked routes blocked by the safety gate |
+| Memorabilia | Batch `DHN-K-QU84D`, cultured ghee from surplus milk, 6 months, **not for sale** |
+
+With all four safety assurances ticked, the three cooked routes (dried roti
+crisps, oil-and-salt vegetable pickle, dehydrated dal papad) unlock and the same
+6-month ghee batch becomes the memorabilia pick.
 
 ### Ollama
 
 ```sh
-ollama pull qwen2.5vl:7b
-ollama serve            # listens on 127.0.0.1:11434 by default
+ollama pull qwen2.5vl:7b   # or qwen2.5vl:3b, the tag tested above (3.2 GB)
+ollama serve               # listens on 127.0.0.1:11434 by default
 ```
 
 Keep the default loopback bind. In the Kitchen tab use
-`http://127.0.0.1:11434/v1`, model `qwen2.5vl:7b`, then **Check server**. Recent
-Ollama builds accept `image_url` data URIs on the OpenAI-compatible endpoint.
-If a build does not, use llama.cpp below.
+`http://127.0.0.1:11434/v1` and the tag you pulled — `qwen2.5vl:7b` is the
+default in the form, and `qwen2.5vl:3b` is what the 2026-10-27 run used — then
+**Check server**. Recent Ollama builds accept `image_url` data URIs on the
+OpenAI-compatible endpoint. If a build does not, use llama.cpp below.
 
 ### llama.cpp
 
@@ -148,6 +204,13 @@ The pantry is deliberately conservative.
 - Field-plot costs are estimates based on the seed ingredient price.
 - Photos are read on the local machine. The built-in planner never calls a
   model; only **Read photo** does, and only against a loopback endpoint.
+- Model output is treated as a transcript, not as advice. The model supplies
+  dish names and, when it can, the guest count; every quantity, price, waste
+  use, native pick and shelf life comes from `qml/kitchen.js`.
+- A model can be confidently wrong, including about its own output. In the
+  2026-10-27 run it read all six dishes correctly and still reported
+  `unreadable` in its notes, so the tab names the model that extracted the lines
+  and shows its notes, and the cook is asked to review the lines.
 
 ## Tests
 

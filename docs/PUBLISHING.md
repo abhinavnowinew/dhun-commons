@@ -15,11 +15,21 @@ This repository follows it exactly: descriptor `schemaVersion` 1, index
 `schemaVersion` 2, `rootHash` copied from `manifest.hashes.root`, and the
 `signature` key omitted for unsigned builds.
 
-> **Status from this checkout.** There is no git remote configured here and no
-> public hosting credentials. Nothing has been pushed or published from this
-> machine, and no public catalog URL exists yet. The steps below are the
-> complete path for the repository owner; the generator and validator work
-> locally and are exercised by CI.
+> **Status.** The 0.3.0 catalog is published publicly at
+> **https://dhun-commons-atecxfewqi9.qoder.website/logos-repo.json** and wired
+> into the local Basecamp package downloader at
+> `module_data/package_downloader/3a9e34c93f16/repositories.json`. The descriptor,
+> index, icon and `.lgx` were fetched back over unauthenticated HTTPS; the `.lgx`
+> matched the index SHA-256 exactly (11,065,234 bytes,
+> `4dc397f9bdf4474c353b995567c38bf7576d60c99f3ee2f8301b338933d18fa1`). The source
+> repository still has no git remote. `dist/public` holds the published files and
+> is gitignored.
+>
+> Basecamp 0.3.2 shows the catalog URL in **Package Manager → Manage
+> Repositories** with its enabled box ticked, next to the official Logos
+> repository, and its Package Manager lists catalog entries with a *Source*
+> column. The Dhun Commons row itself was not read back off that screen; confirm
+> it there after a **Reload**.
 
 ## 1. Bump the version
 
@@ -148,14 +158,14 @@ Never commit a private key.
 
 ## Hosting checklist
 
-- [ ] `logos-repo.json` is reachable over HTTPS and parses as JSON.
-- [ ] `indexUrl` is an absolute HTTPS URL to `index.json`.
-- [ ] Every version `url` returns the exact `.lgx` bytes.
-- [ ] `rootHash` equals the `.lgx` manifest's `hashes.root`.
-- [ ] `sha256` and `size` are recorded for humans and mirrors.
-- [ ] The icon path resolves relative to the index URL.
-- [ ] The release is public, not a draft.
-- [ ] `node scripts/make-catalog.mjs --check catalog` passes.
+- [x] `logos-repo.json` is reachable over HTTPS and parses as JSON.
+- [x] `indexUrl` is an absolute HTTPS URL to `index.json`.
+- [x] Every version `url` returns the exact `.lgx` bytes.
+- [x] `rootHash` equals the `.lgx` manifest's `hashes.root`.
+- [x] `sha256` and `size` are recorded for humans and mirrors.
+- [x] The icon path resolves relative to the index URL.
+- [x] The release is public, not a draft.
+- [x] `node scripts/make-catalog.mjs --check catalog` passes.
 
 ## What is still not public
 

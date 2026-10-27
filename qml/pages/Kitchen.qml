@@ -19,7 +19,7 @@ Item {
     property string menuText: Kitchen.sampleMenus[0].text
     property string photoPath: ""
     property string modelEndpoint: "http://127.0.0.1:11434/v1"
-    property string modelName: "qwen2.5vl:7b"
+    property string modelName: "qwen2.5vl:3b"
     property bool modelBusy: false
     property string modelStatus: "No model called. The built-in planner reads the typed lines offline."
     property string modelProvenance: "Built-in planner · offline"
@@ -143,7 +143,7 @@ Item {
             return;
         }
         if (!modelName.trim().length) {
-            modelStatus = "Name the local vision model first (for example qwen2.5vl:7b).";
+            modelStatus = "Name the local vision model first (for example qwen2.5vl:3b).";
             return;
         }
         if (!host || !host.relayBackend || typeof logos === "undefined" || logos === null) {
@@ -399,7 +399,7 @@ Item {
                         text: page.modelName
                         maximumLength: 80
                         onTextChanged: if (page.modelName !== text) page.modelName = text
-                        hint: "For example qwen2.5vl:7b with Ollama, or a llama.cpp server model."
+                        hint: "qwen2.5vl:3b is the tested default; qwen2.5vl:7b reads dense menus better but needs more memory."
                     }
 
                     RowLayout {
