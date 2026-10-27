@@ -55,18 +55,27 @@ sample menus in `qml/kitchen.js` are:
 
 Pressing **Read photo**:
 
-1. asks the Dhun Commons backend (`readPhotoBase64`) to read a local image and
-   return base64 (PNG, JPEG or WebP, ≤ 8 MiB; HEIC is refused with an error);
-2. sends an OpenAI-compatible `POST /v1/chat/completions` request to a
-   **loopback** endpoint with the image as a `data:` URI;
-3. parses a strict JSON reply of dish names, optional guest count and optional
-   notes;
+1. asks the module backend (`startMenuPhoto`) to read the local image — PNG,
+   JPEG or WebP, ≤ 8 MiB; HEIC is refused with an error;
+2. the backend sends an OpenAI-compatible `POST /v1/chat/completions` request to
+   a **loopback** endpoint with the image as a `data:` URI, then stores the
+   outcome in `modelState`/`modelReply`;
+3. the tab polls those properties every 400 ms, then parses a strict JSON reply
+   of dish names, optional guest count and optional notes;
 4. matches the names against the built-in dish library and reports unmatched
    lines instead of inventing ingredients;
 5. rebuilds the plan from the matched lines.
 
-The endpoint must be `127.0.0.1`, `localhost` or `[::1]`. The QML client refuses
-any other host before opening a request. The default is
+The request lives in the backend on purpose. Basecamp sandboxes plugin QML
+network access with a deny-all access-manager factory
+(`app/restricted/QmlSandbox.cpp`, `DenyAllNAMFactory`), so a QML
+`XMLHttpRequest` to `127.0.0.1:11434` fails inside the app even when the same
+request works from a plain Qt harness. The backend runs in the host process and
+can still reach a loopback server. A side effect is that remote endpoints are
+refused in two places: the tab checks the endpoint before calling the slot, and
+`loopbackChatUrl` re-validates it in C++.
+
+The endpoint must be `127.0.0.1`, `localhost` or `[::1]`. The default is
 `http://127.0.0.1:11434/v1` with model `qwen2.5vl:3b`, the build this machine has
 installed and the one tested below; the model field is editable, and
 `qwen2.5vl:7b` reads denser menus more reliably if you have the memory for it.
@@ -140,6 +149,21 @@ With all four safety assurances ticked, the three cooked routes (dried roti
 crisps, oil-and-salt vegetable pickle, dehydrated dal papad) unlock and the same
 6-month ghee batch becomes the memorabilia pick.
 
+### Verified inside Basecamp, 2026-10-27
+
+The same request was repeated from the installed app (module 0.3.0 in Basecamp
+0.3.2, plugin QML sandbox active):
+
+- **Check server** reported `Local server reachable at
+  http://127.0.0.1:11434/v1/models · qwen2.5vl:3b`.
+- **Read photo** produced, in Ollama's access log, `POST /v1/chat/completions`
+  from `127.0.0.1` with status 200 in 13.04 s and 1,806 prompt tokens (104
+  text, 1,702 image) plus 76 completion tokens — the same image and prompt as
+  the standalone run above.
+
+Before the backend transport, the same click failed because the sandbox blocks
+plugin QML networking; the probe and the chat request both reach the model now.
+
 ### Ollama
 
 ```sh
@@ -148,10 +172,11 @@ ollama serve               # listens on 127.0.0.1:11434 by default
 ```
 
 Keep the default loopback bind. In the Kitchen tab use
-`http://127.0.0.1:11434/v1` and the tag you pulled — `qwen2.5vl:7b` is the
-default in the form, and `qwen2.5vl:3b` is what the 2026-10-27 run used — then
-**Check server**. Recent Ollama builds accept `image_url` data URIs on the
-OpenAI-compatible endpoint. If a build does not, use llama.cpp below.
+`http://127.0.0.1:11434/v1` and the tag you pulled — `qwen2.5vl:3b` is the
+default in the form and what the 2026-10-27 run used; switch to `qwen2.5vl:7b`
+when you have the memory — then **Check server**. Recent Ollama builds accept
+`image_url` data URIs on the OpenAI-compatible endpoint. If a build does not,
+use llama.cpp below.
 
 ### llama.cpp
 

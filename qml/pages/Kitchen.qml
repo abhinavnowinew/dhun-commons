@@ -34,6 +34,13 @@ Item {
     readonly property var season: plan && plan.season ? plan.season : Kitchen.seasonForMonth(month)
     readonly property string monthLabel: Data.monthNames[Math.max(0, month - 1)] + " · " + season.name
 
+    Timer {
+        id: modelPoll
+        interval: 400
+        repeat: true
+        onTriggered: page.pollModel()
+    }
+
     function localPath(url) {
         var value = String(url === undefined || url === null ? "" : url);
         if (value.indexOf("file://") === 0) value = value.substring(7);
@@ -93,47 +100,38 @@ Item {
         return Theme.clayLight;
     }
 
+    function backendReady() {
+        return host && host.relayBackend && typeof logos !== "undefined" && logos !== null;
+    }
+
     function checkServer() {
         if (!Kitchen.localEndpointAllowed(modelEndpoint)) {
             modelStatus = "Only a loopback endpoint is allowed. Use http://127.0.0.1:11434/v1 or another local port.";
             return;
         }
+        if (!backendReady()) {
+            modelStatus = "The module backend is not ready. Open Dhun Commons inside Basecamp to reach a local model.";
+            return;
+        }
         modelBusy = true;
         modelStatus = "Checking " + Kitchen.modelsUrl(modelEndpoint) + " …";
-        var xhr = new XMLHttpRequest();
-        xhr.open("GET", Kitchen.modelsUrl(modelEndpoint), true);
-        xhr.timeout = 8000;
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState !== XMLHttpRequest.DONE) return;
+        logos.watch(host.relayBackend.probeModelServer(modelEndpoint), function (value) {
             page.modelBusy = false;
-            if (xhr.status < 200 || xhr.status >= 300) {
-                page.modelStatus = "No local model server replied (HTTP " + xhr.status + "). Start Ollama or llama.cpp and try again.";
+            var reply = {};
+            try { reply = JSON.parse(String(value)); } catch (error) { reply = {}; }
+            if (!reply.success) {
+                page.modelStatus = reply.error || "No local model server replied. Start Ollama or llama.cpp on loopback.";
                 return;
             }
-            try {
-                var data = JSON.parse(xhr.responseText);
-                var items = data.data || data.models || [];
-                var names = [];
-                for (var i = 0; i < items.length && names.length < 6; ++i) {
-                    var name = items[i].id || items[i].name || items[i].model;
-                    if (name) names.push(name);
-                }
-                page.modelStatus = names.length
-                    ? "Local server reachable · " + names.join(" · ")
-                    : "Local server reachable, but it listed no models.";
-            } catch (error) {
-                page.modelStatus = "The local server replied, but the model list was not readable.";
-            }
-        };
-        xhr.onerror = function () {
+            var names = reply.models || [];
+            var label = String(reply.url || page.modelEndpoint);
+            page.modelStatus = names.length
+                ? "Local server reachable at " + label + " · " + names.join(" · ")
+                : "Local server reachable at " + label + ", but it listed no models.";
+        }, function (error) {
             page.modelBusy = false;
-            page.modelStatus = "No local model server replied. Start Ollama or llama.cpp on loopback.";
-        };
-        xhr.ontimeout = function () {
-            page.modelBusy = false;
-            page.modelStatus = "The local model server did not reply in time.";
-        };
-        xhr.send();
+            page.modelStatus = "The module backend could not check the model server: " + error;
+        });
     }
 
     function readPhotoWithModel() {
@@ -146,100 +144,61 @@ Item {
             modelStatus = "Name the local vision model first (for example qwen2.5vl:3b).";
             return;
         }
-        if (!host || !host.relayBackend || typeof logos === "undefined" || logos === null) {
+        if (!backendReady()) {
             modelStatus = "The module backend is not ready. Open Dhun Commons inside Basecamp to read a local photo.";
             return;
         }
         var path = localPath(photoUrl);
         modelBusy = true;
-        modelStatus = "Reading the image locally …";
-        logos.watch(host.relayBackend.readPhotoBase64(path), function (value) {
-            page.sendPhotoToModel(value, path);
+        modelStatus = "Reading the photo and asking " + modelName + " on loopback. Local inference can take a while …";
+        logos.watch(host.relayBackend.startMenuPhoto(path, modelEndpoint, modelName, Kitchen.MODEL_PROMPT), function (value) {
+            var started = {};
+            try { started = JSON.parse(String(value)); } catch (error) { started = {}; }
+            if (!started.success) {
+                page.modelBusy = false;
+                page.modelStatus = started.error || "The module backend refused the request.";
+                return;
+            }
+            page.modelPoll.start();
         }, function (error) {
             page.modelBusy = false;
-            page.modelStatus = "Could not read the photo: " + error;
+            page.modelStatus = "The module backend could not start the request: " + error;
         });
     }
 
-    function sendPhotoToModel(value, path) {
-        var result;
-        try {
-            result = JSON.parse(String(value));
-        } catch (error) {
+    function pollModel() {
+        if (!backendReady()) {
+            modelPoll.stop();
             modelBusy = false;
-            modelStatus = "The backend returned an unreadable photo payload.";
+            modelStatus = "The module backend is no longer reachable.";
             return;
         }
-        if (!result || !result.success) {
-            modelBusy = false;
-            modelStatus = "The photo was not read: " + (result && result.error ? result.error : "unknown error");
+        var state = String(host.relayBackend.modelState || "");
+        if (state === "busy" || state === "idle")
+            return;
+        modelPoll.stop();
+        modelBusy = false;
+        var snapshot = {};
+        try { snapshot = JSON.parse(String(host.relayBackend.modelReply || "{}")); } catch (error) { snapshot = {}; }
+        if (state !== "done") {
+            modelStatus = snapshot.error || "The local model request failed.";
             return;
         }
-        var payload = {
-            model: modelName,
-            temperature: 0,
-            max_tokens: 500,
-            messages: [{
-                role: "user",
-                content: [
-                    { type: "text", text: Kitchen.MODEL_PROMPT },
-                    { type: "image_url", image_url: { url: "data:" + result.mime + ";base64," + result.base64 } }
-                ]
-            }]
-        };
-        modelStatus = "Asking " + modelName + " on loopback. Local inference can take a while …";
-        var started = Date.now();
-        var xhr = new XMLHttpRequest();
-        xhr.open("POST", Kitchen.chatCompletionsUrl(modelEndpoint), true);
-        xhr.setRequestHeader("Content-Type", "application/json");
-        xhr.timeout = 180000;
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState !== XMLHttpRequest.DONE) return;
-            page.modelBusy = false;
-            if (xhr.status < 200 || xhr.status >= 300) {
-                page.modelStatus = "The local model returned HTTP " + xhr.status + ". Check the model name and server.";
-                return;
-            }
-            var content = "";
-            try {
-                var data = JSON.parse(xhr.responseText);
-                var message = data.choices && data.choices[0] ? data.choices[0].message : null;
-                content = message ? message.content : "";
-                if (Object.prototype.toString.call(content) === "[object Array]") {
-                    var parts = [];
-                    for (var i = 0; i < content.length; ++i)
-                        if (content[i] && content[i].text) parts.push(content[i].text);
-                    content = parts.join(" ");
-                }
-            } catch (error) {
-                page.modelStatus = "The local model replied, but the response was not readable JSON.";
-                return;
-            }
-            var reply = Kitchen.parseModelReply(content);
-            if (!reply.ok) {
-                page.modelStatus = reply.error;
-                return;
-            }
-            if (!reply.matched) {
-                page.modelStatus = "The model returned " + reply.dishes.length + " dish names, but none matched the kitchen library. Edit the lines by hand.";
-                return;
-            }
-            page.setMenuText(Kitchen.modelReplyToText(reply));
-            if (reply.servings > 0) page.guests = reply.servings;
-            page.modelProvenance = "Extracted by " + page.modelName + " on loopback · review the lines and the safety gate.";
-            page.modelStatus = "Reply received in " + Math.max(1, Math.round((Date.now() - started) / 1000)) + " s." +
-                (reply.notes.length ? " " + reply.notes.join(" · ") : "");
-            page.rebuild();
-        };
-        xhr.onerror = function () {
-            page.modelBusy = false;
-            page.modelStatus = "The local model did not accept the request. Is the server running on loopback?";
-        };
-        xhr.ontimeout = function () {
-            page.modelBusy = false;
-            page.modelStatus = "The local model timed out after 180 seconds.";
-        };
-        xhr.send(JSON.stringify(payload));
+        var reply = Kitchen.parseModelReply(snapshot.content || "");
+        if (!reply.ok) {
+            modelStatus = reply.error;
+            return;
+        }
+        if (!reply.matched) {
+            modelStatus = "The model returned " + reply.dishes.length + " dish names, but none matched the kitchen library. Edit the lines by hand.";
+            return;
+        }
+        setMenuText(Kitchen.modelReplyToText(reply));
+        if (reply.servings > 0) guests = reply.servings;
+        modelProvenance = "Extracted by " + modelName + " on loopback · review the lines and the safety gate.";
+        modelStatus = "Reply received in " + Math.max(1, Math.round(Number(snapshot.seconds) || 0)) + " s." +
+            (reply.notes.length ? " " + reply.notes.join(" · ") : "");
+        rebuild();
     }
 
     Component.onCompleted: {

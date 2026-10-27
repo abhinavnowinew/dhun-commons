@@ -10,6 +10,8 @@ class DhunCommons
     SLOT(QString telegramInbox())
     SLOT(QString ackTelegramMessage(QString id))
     SLOT(QString readPhotoBase64(QString path))
+    SLOT(QString probeModelServer(QString endpoint))
+    SLOT(QString startMenuPhoto(QString path, QString endpoint, QString model, QString prompt))
 
     PROP(QString chainStatus="uninitialized" READONLY)
     PROP(QString chainNotice="" READONLY)
@@ -21,4 +23,6 @@ class DhunCommons
     PROP(QString chainLastTx="{}" READONLY)
     PROP(bool chainBusy=false READONLY)
     PROP(QString telegramDir="" READONLY)
+    PROP(QString modelState="idle" READONLY)
+    PROP(QString modelReply="{}" READONLY)
 }

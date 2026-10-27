@@ -5,16 +5,21 @@
 #include <QDateTime>
 #include <QDebug>
 #include <QDir>
+#include <QEventLoop>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
 #include <QRegularExpression>
 #include <QSaveFile>
 #include <QSet>
 #include <QStandardPaths>
 #include <QTimer>
+#include <QUrl>
 
 namespace {
 
@@ -825,43 +830,71 @@ QString DhunCommonsBackend::ackTelegramMessage(QString id)
     return jsonCompact(result);
 }
 
-QString DhunCommonsBackend::readPhotoBase64(QString path)
+bool DhunCommonsBackend::readPhotoBytes(const QString& path,
+                                        QByteArray* bytes,
+                                        QString* mime,
+                                        QString* error) const
 {
     const QString requested = path.trimmed();
-    if (requested.isEmpty())
-        return jsonCompact(failureObject(QStringLiteral("Choose a menu photo first.")));
+    if (requested.isEmpty()) {
+        *error = QStringLiteral("Choose a menu photo first.");
+        return false;
+    }
 
     const QFileInfo info(requested);
     const QString resolved = info.canonicalFilePath();
-    if (resolved.isEmpty() || !info.isFile())
-        return jsonCompact(failureObject(QStringLiteral("The chosen photo is not a readable file.")));
+    if (resolved.isEmpty() || !info.isFile()) {
+        *error = QStringLiteral("The chosen photo is not a readable file.");
+        return false;
+    }
 
     const qint64 maxBytes = 8 * 1024 * 1024;
-    if (info.size() <= 0)
-        return jsonCompact(failureObject(QStringLiteral("The chosen photo is empty.")));
-    if (info.size() > maxBytes)
-        return jsonCompact(failureObject(QStringLiteral("The photo is larger than 8 MB. Choose a smaller image.")));
+    if (info.size() <= 0) {
+        *error = QStringLiteral("The chosen photo is empty.");
+        return false;
+    }
+    if (info.size() > maxBytes) {
+        *error = QStringLiteral("The photo is larger than 8 MB. Choose a smaller image.");
+        return false;
+    }
 
     const QString suffix = info.suffix().toLower();
-    QString mime;
     if (suffix == QStringLiteral("png"))
-        mime = QStringLiteral("image/png");
+        *mime = QStringLiteral("image/png");
     else if (suffix == QStringLiteral("jpg") || suffix == QStringLiteral("jpeg"))
-        mime = QStringLiteral("image/jpeg");
+        *mime = QStringLiteral("image/jpeg");
     else if (suffix == QStringLiteral("webp"))
-        mime = QStringLiteral("image/webp");
-    else
-        return jsonCompact(failureObject(QStringLiteral("Only PNG, JPEG or WebP menu photos can be read. Convert HEIC before choosing it.")));
+        *mime = QStringLiteral("image/webp");
+    else {
+        *error = QStringLiteral("Only PNG, JPEG or WebP menu photos can be read. Convert HEIC before choosing it.");
+        return false;
+    }
 
     QFile file(resolved);
-    if (!file.open(QIODevice::ReadOnly))
-        return jsonCompact(failureObject(QStringLiteral("The chosen photo could not be opened.")));
-    const QByteArray bytes = file.readAll();
+    if (!file.open(QIODevice::ReadOnly)) {
+        *error = QStringLiteral("The chosen photo could not be opened.");
+        return false;
+    }
+    *bytes = file.readAll();
     file.close();
-    if (bytes.isEmpty())
-        return jsonCompact(failureObject(QStringLiteral("The chosen photo is empty.")));
-    if (bytes.size() > maxBytes)
-        return jsonCompact(failureObject(QStringLiteral("The photo is larger than 8 MB. Choose a smaller image.")));
+    if (bytes->isEmpty()) {
+        *error = QStringLiteral("The chosen photo is empty.");
+        return false;
+    }
+    if (bytes->size() > maxBytes) {
+        *error = QStringLiteral("The photo is larger than 8 MB. Choose a smaller image.");
+        return false;
+    }
+    return true;
+}
+
+QString DhunCommonsBackend::readPhotoBase64(QString path)
+{
+    QByteArray bytes;
+    QString mime;
+    QString error;
+    if (!readPhotoBytes(path, &bytes, &mime, &error))
+        return jsonCompact(failureObject(error));
 
     QJsonObject result;
     result.insert(QStringLiteral("success"), true);
@@ -869,4 +902,274 @@ QString DhunCommonsBackend::readPhotoBase64(QString path)
     result.insert(QStringLiteral("bytes"), static_cast<double>(bytes.size()));
     result.insert(QStringLiteral("base64"), QString::fromLatin1(bytes.toBase64()));
     return jsonCompact(result);
+}
+
+bool DhunCommonsBackend::loopbackChatUrl(const QString& endpoint, QString* url, QString* error) const
+{
+    const QUrl parsed(endpoint.trimmed());
+    const QString scheme = parsed.scheme().toLower();
+    const QString host = parsed.host().toLower();
+    const bool loopback = host == QStringLiteral("127.0.0.1")
+        || host == QStringLiteral("localhost")
+        || host == QStringLiteral("::1");
+    if ((scheme != QStringLiteral("http") && scheme != QStringLiteral("https")) || !loopback) {
+        *error = QStringLiteral("Only a loopback endpoint such as http://127.0.0.1:11434/v1 is allowed.");
+        return false;
+    }
+
+    QString base = parsed.adjusted(QUrl::RemoveQuery | QUrl::RemoveFragment | QUrl::NormalizePathSegments).toString();
+    while (base.endsWith(QLatin1Char('/')))
+        base.chop(1);
+    if (base.endsWith(QStringLiteral("/v1/chat/completions")))
+        *url = base;
+    else if (base.endsWith(QStringLiteral("/v1")))
+        *url = base + QStringLiteral("/chat/completions");
+    else
+        *url = base + QStringLiteral("/v1/chat/completions");
+    return true;
+}
+
+QString DhunCommonsBackend::probeModelServer(QString endpoint)
+{
+    QString chatUrl;
+    QString error;
+    if (!loopbackChatUrl(endpoint, &chatUrl, &error))
+        return jsonCompact(failureObject(error));
+
+    QString modelsUrl = chatUrl;
+    modelsUrl.replace(QRegularExpression(QStringLiteral("/chat/completions$")),
+                      QStringLiteral("/models"));
+
+    QNetworkAccessManager network;
+    QNetworkRequest request{QUrl(modelsUrl)};
+    request.setTransferTimeout(4000);
+    QNetworkReply* reply = network.get(request);
+    QEventLoop loop;
+    QTimer guard;
+    guard.setSingleShot(true);
+    QObject::connect(&guard, &QTimer::timeout, &loop, &QEventLoop::quit);
+    QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    guard.start(5000);
+    loop.exec();
+
+    QJsonObject result;
+    if (!reply->isFinished()) {
+        reply->abort();
+        reply->deleteLater();
+        result = failureObject(QStringLiteral("The local model server did not answer within 5 seconds."));
+        return jsonCompact(result);
+    }
+
+    const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    const QByteArray body = reply->readAll();
+    const QString networkError = reply->errorString();
+    const bool failed = reply->error() != QNetworkReply::NoError && status == 0;
+    reply->deleteLater();
+
+    if (failed) {
+        result = failureObject(QStringLiteral("No local model server replied: ") + networkError);
+        result.insert(QStringLiteral("url"), modelsUrl);
+        return jsonCompact(result);
+    }
+    if (status < 200 || status >= 300) {
+        result = failureObject(QStringLiteral("The local model server replied with HTTP ") + QString::number(status) + QLatin1Char('.'));
+        result.insert(QStringLiteral("status"), status);
+        return jsonCompact(result);
+    }
+
+    QJsonArray names;
+    const QJsonObject data = QJsonDocument::fromJson(body).object();
+    const QJsonArray items = data.contains(QStringLiteral("data"))
+        ? data.value(QStringLiteral("data")).toArray()
+        : data.value(QStringLiteral("models")).toArray();
+    for (const QJsonValue& item : items) {
+        const QJsonObject entry = item.toObject();
+        QString name = entry.value(QStringLiteral("id")).toString();
+        if (name.isEmpty())
+            name = entry.value(QStringLiteral("name")).toString();
+        if (name.isEmpty())
+            name = entry.value(QStringLiteral("model")).toString();
+        if (!name.isEmpty() && names.size() < 6)
+            names.append(name);
+    }
+
+    result.insert(QStringLiteral("success"), true);
+    result.insert(QStringLiteral("status"), status);
+    result.insert(QStringLiteral("url"), modelsUrl);
+    result.insert(QStringLiteral("models"), names);
+    return jsonCompact(result);
+}
+
+void DhunCommonsBackend::finishModelRequest(const QString& state, const QJsonObject& payload)
+{
+    QJsonObject snapshot = payload;
+    snapshot.insert(QStringLiteral("state"), state);
+    setModelReply(jsonCompact(snapshot));
+    setModelState(state);
+}
+
+QString DhunCommonsBackend::startMenuPhoto(QString path,
+                                           QString endpoint,
+                                           QString model,
+                                           QString prompt)
+{
+    if (m_modelReplyHandle) {
+        return jsonCompact(failureObject(QStringLiteral("A menu photo request is already running.")));
+    }
+
+    QString chatUrl;
+    QString error;
+    if (!loopbackChatUrl(endpoint, &chatUrl, &error)) {
+        finishModelRequest(QStringLiteral("failed"), failureObject(error));
+        return jsonCompact(failureObject(error));
+    }
+
+    const QString name = model.trimmed();
+    if (name.isEmpty()) {
+        const QString message = QStringLiteral("Name the local vision model first (for example qwen2.5vl:3b).");
+        finishModelRequest(QStringLiteral("failed"), failureObject(message));
+        return jsonCompact(failureObject(message));
+    }
+
+    QByteArray bytes;
+    QString mime;
+    if (!readPhotoBytes(path, &bytes, &mime, &error)) {
+        finishModelRequest(QStringLiteral("failed"), failureObject(error));
+        return jsonCompact(failureObject(error));
+    }
+
+    const QString instruction = prompt.trimmed();
+    if (instruction.isEmpty()) {
+        const QString message = QStringLiteral("The menu-reading instruction was empty.");
+        finishModelRequest(QStringLiteral("failed"), failureObject(message));
+        return jsonCompact(failureObject(message));
+    }
+
+    QJsonObject imageUrl;
+    imageUrl.insert(QStringLiteral("url"),
+                    QStringLiteral("data:") + mime + QStringLiteral(";base64,")
+                        + QString::fromLatin1(bytes.toBase64()));
+    QJsonObject textPart;
+    textPart.insert(QStringLiteral("type"), QStringLiteral("text"));
+    textPart.insert(QStringLiteral("text"), instruction);
+    QJsonObject imagePart;
+    imagePart.insert(QStringLiteral("type"), QStringLiteral("image_url"));
+    imagePart.insert(QStringLiteral("image_url"), imageUrl);
+    QJsonArray content;
+    content.append(textPart);
+    content.append(imagePart);
+    QJsonObject message;
+    message.insert(QStringLiteral("role"), QStringLiteral("user"));
+    message.insert(QStringLiteral("content"), content);
+    QJsonArray messages;
+    messages.append(message);
+
+    QJsonObject payload;
+    payload.insert(QStringLiteral("model"), name);
+    payload.insert(QStringLiteral("temperature"), 0);
+    payload.insert(QStringLiteral("max_tokens"), 500);
+    payload.insert(QStringLiteral("messages"), messages);
+
+    if (!m_modelNetwork)
+        m_modelNetwork = new QNetworkAccessManager(this);
+    if (!m_modelClock) {
+        m_modelClock = new QTimer(this);
+        m_modelClock->setSingleShot(true);
+        QObject::connect(m_modelClock, &QTimer::timeout, this, [this]() {
+            if (!m_modelReplyHandle)
+                return;
+            m_modelReplyHandle->abort();
+        });
+    }
+
+    QNetworkRequest request{QUrl(chatUrl)};
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+    request.setTransferTimeout(185000);
+
+    m_modelStartedMs = QDateTime::currentMSecsSinceEpoch();
+    setModelReply(QStringLiteral("{}"));
+    setModelState(QStringLiteral("busy"));
+    m_modelReplyHandle = m_modelNetwork->post(request, QJsonDocument(payload).toJson(QJsonDocument::Compact));
+    m_modelClock->start(190000);
+
+    QObject::connect(m_modelReplyHandle, &QNetworkReply::finished, this, [this, name]() {
+        QNetworkReply* reply = m_modelReplyHandle;
+        if (!reply)
+            return;
+        m_modelReplyHandle = nullptr;
+        if (m_modelClock)
+            m_modelClock->stop();
+
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const QByteArray body = reply->readAll();
+        const QString networkError = reply->errorString();
+        const bool transportFailed = reply->error() != QNetworkReply::NoError && status == 0;
+        reply->deleteLater();
+
+        QJsonObject result;
+        result.insert(QStringLiteral("httpStatus"), status);
+        result.insert(QStringLiteral("model"), name);
+        result.insert(QStringLiteral("seconds"),
+                      (QDateTime::currentMSecsSinceEpoch() - m_modelStartedMs) / 1000.0);
+
+        if (transportFailed) {
+            const bool timedOut = networkError.contains(QStringLiteral("timed out"), Qt::CaseInsensitive)
+                || networkError.contains(QStringLiteral("Operation canceled"), Qt::CaseInsensitive);
+            result.insert(QStringLiteral("error"),
+                          timedOut
+                              ? QStringLiteral("The local model did not answer in time. It may still be loading the image.")
+                              : QStringLiteral("The local model server did not answer: ") + networkError);
+            finishModelRequest(QStringLiteral("failed"), result);
+            return;
+        }
+
+        if (status < 200 || status >= 300) {
+            QString detail = QString::fromUtf8(body).left(300).trimmed();
+            if (detail.isEmpty())
+                detail = networkError;
+            result.insert(QStringLiteral("error"),
+                          QStringLiteral("The local model returned HTTP ") + QString::number(status)
+                              + (detail.isEmpty() ? QString() : QStringLiteral(": ") + detail));
+            finishModelRequest(QStringLiteral("failed"), result);
+            return;
+        }
+
+        const QJsonObject parsed = QJsonDocument::fromJson(body).object();
+        const QJsonArray choices = parsed.value(QStringLiteral("choices")).toArray();
+        QString content;
+        if (!choices.isEmpty()) {
+            const QJsonValue value = choices.first().toObject()
+                                         .value(QStringLiteral("message")).toObject()
+                                         .value(QStringLiteral("content"));
+            if (value.isString()) {
+                content = value.toString();
+            } else if (value.isArray()) {
+                QStringList parts;
+                for (const QJsonValue& part : value.toArray()) {
+                    const QString text = part.toObject().value(QStringLiteral("text")).toString();
+                    if (!text.isEmpty())
+                        parts.append(text);
+                }
+                content = parts.join(QLatin1Char(' '));
+            }
+        }
+
+        if (content.trimmed().isEmpty()) {
+            result.insert(QStringLiteral("error"),
+                          QStringLiteral("The local model returned no text. Check the model name and try again."));
+            finishModelRequest(QStringLiteral("failed"), result);
+            return;
+        }
+
+        const QJsonObject usage = parsed.value(QStringLiteral("usage")).toObject();
+        if (!usage.isEmpty())
+            result.insert(QStringLiteral("usage"), usage);
+        result.insert(QStringLiteral("content"), content);
+        finishModelRequest(QStringLiteral("done"), result);
+    });
+
+    QJsonObject started;
+    started.insert(QStringLiteral("success"), true);
+    started.insert(QStringLiteral("url"), chatUrl);
+    return jsonCompact(started);
 }
