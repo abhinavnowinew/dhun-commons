@@ -34,13 +34,6 @@ Item {
     readonly property var season: plan && plan.season ? plan.season : Kitchen.seasonForMonth(month)
     readonly property string monthLabel: Data.monthNames[Math.max(0, month - 1)] + " · " + season.name
 
-    Timer {
-        id: modelPoll
-        interval: 400
-        repeat: true
-        onTriggered: page.pollModel()
-    }
-
     function localPath(url) {
         var value = String(url === undefined || url === null ? "" : url);
         if (value.indexOf("file://") === 0) value = value.substring(7);
@@ -152,53 +145,32 @@ Item {
         modelBusy = true;
         modelStatus = "Reading the photo and asking " + modelName + " on loopback. Local inference can take a while …";
         logos.watch(host.relayBackend.startMenuPhoto(path, modelEndpoint, modelName, Kitchen.MODEL_PROMPT), function (value) {
-            var started = {};
-            try { started = JSON.parse(String(value)); } catch (error) { started = {}; }
-            if (!started.success) {
-                page.modelBusy = false;
-                page.modelStatus = started.error || "The module backend refused the request.";
+            page.modelBusy = false;
+            var snapshot = {};
+            try { snapshot = JSON.parse(String(value)); } catch (error) { snapshot = {}; }
+            if (!snapshot.success) {
+                page.modelStatus = snapshot.error || "The local model request failed.";
                 return;
             }
-            page.modelPoll.start();
+            var reply = Kitchen.parseModelReply(snapshot.content || "");
+            if (!reply.ok) {
+                page.modelStatus = reply.error;
+                return;
+            }
+            if (!reply.matched) {
+                page.modelStatus = "The model returned " + reply.dishes.length + " dish names, but none matched the kitchen library. Edit the lines by hand.";
+                return;
+            }
+            page.setMenuText(Kitchen.modelReplyToText(reply));
+            if (reply.servings > 0) page.guests = reply.servings;
+            page.modelProvenance = "Extracted by " + page.modelName + " on loopback · review the lines and the safety gate.";
+            page.modelStatus = "Reply received in " + Math.max(1, Math.round(Number(snapshot.seconds) || 0)) + " s." +
+                (reply.notes.length ? " " + reply.notes.join(" · ") : "");
+            page.rebuild();
         }, function (error) {
             page.modelBusy = false;
-            page.modelStatus = "The module backend could not start the request: " + error;
+            page.modelStatus = "The module backend could not reach the local model: " + error;
         });
-    }
-
-    function pollModel() {
-        if (!backendReady()) {
-            modelPoll.stop();
-            modelBusy = false;
-            modelStatus = "The module backend is no longer reachable.";
-            return;
-        }
-        var state = String(host.relayBackend.modelState || "");
-        if (state === "busy" || state === "idle")
-            return;
-        modelPoll.stop();
-        modelBusy = false;
-        var snapshot = {};
-        try { snapshot = JSON.parse(String(host.relayBackend.modelReply || "{}")); } catch (error) { snapshot = {}; }
-        if (state !== "done") {
-            modelStatus = snapshot.error || "The local model request failed.";
-            return;
-        }
-        var reply = Kitchen.parseModelReply(snapshot.content || "");
-        if (!reply.ok) {
-            modelStatus = reply.error;
-            return;
-        }
-        if (!reply.matched) {
-            modelStatus = "The model returned " + reply.dishes.length + " dish names, but none matched the kitchen library. Edit the lines by hand.";
-            return;
-        }
-        setMenuText(Kitchen.modelReplyToText(reply));
-        if (reply.servings > 0) guests = reply.servings;
-        modelProvenance = "Extracted by " + modelName + " on loopback · review the lines and the safety gate.";
-        modelStatus = "Reply received in " + Math.max(1, Math.round(Number(snapshot.seconds) || 0)) + " s." +
-            (reply.notes.length ? " " + reply.notes.join(" · ") : "");
-        rebuild();
     }
 
     Component.onCompleted: {

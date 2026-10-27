@@ -1,16 +1,11 @@
 #pragma once
 
-#include <QPointer>
 #include <QString>
 
 #include <QJsonObject>
 
 #include "logos_ui_plugin_context.h"
 #include "rep_dhun_commons_source.h"
-
-class QNetworkAccessManager;
-class QNetworkReply;
-class QTimer;
 
 class DhunCommonsBackend : public DhunCommonsSimpleSource,
                            public LogosUiPluginContext
@@ -49,13 +44,8 @@ private:
     bool moduleReady() const;
     bool readPhotoBytes(const QString& path, QByteArray* bytes, QString* mime, QString* error) const;
     bool loopbackChatUrl(const QString& endpoint, QString* url, QString* error) const;
-    void finishModelRequest(const QString& state, const QJsonObject& payload);
 
     bool m_contextReady = false;
     bool m_walletOpen = false;
     bool m_busy = false;
-    QNetworkAccessManager* m_modelNetwork = nullptr;
-    QPointer<QNetworkReply> m_modelReplyHandle;
-    QTimer* m_modelClock = nullptr;
-    qint64 m_modelStartedMs = 0;
 };

@@ -23,6 +23,4 @@ class DhunCommons
     PROP(QString chainLastTx="{}" READONLY)
     PROP(bool chainBusy=false READONLY)
     PROP(QString telegramDir="" READONLY)
-    PROP(QString modelState="idle" READONLY)
-    PROP(QString modelReply="{}" READONLY)
 }

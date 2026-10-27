@@ -58,13 +58,21 @@ Pressing **Read photo**:
 1. asks the module backend (`startMenuPhoto`) to read the local image — PNG,
    JPEG or WebP, ≤ 8 MiB; HEIC is refused with an error;
 2. the backend sends an OpenAI-compatible `POST /v1/chat/completions` request to
-   a **loopback** endpoint with the image as a `data:` URI, then stores the
-   outcome in `modelState`/`modelReply`;
-3. the tab polls those properties every 400 ms, then parses a strict JSON reply
+   a **loopback** endpoint with the image as a `data:` URI and returns the
+   finished result as one JSON snapshot — the slot waits on the reply (185 s
+   transfer timeout, 190 s guard) instead of reporting progress separately;
+3. the tab's `logos.watch` callback parses that snapshot as a strict JSON reply
    of dish names, optional guest count and optional notes;
 4. matches the names against the built-in dish library and reports unmatched
    lines instead of inventing ingredients;
 5. rebuilds the plan from the matched lines.
+
+The result comes back through the slot's return value on purpose. With a
+`.rep` PROP, the replica in the UI process kept reading its cached value, so an
+earlier asynchronous build posted the request successfully but the tab never
+saw the stored reply. A slot invoked through `logos.watch` is the supported
+path for a value that crosses the module boundary, and the same pattern already
+backs **Check server**.
 
 The request lives in the backend on purpose. Basecamp sandboxes plugin QML
 network access with a deny-all access-manager factory
@@ -151,16 +159,24 @@ crisps, oil-and-salt vegetable pickle, dehydrated dal papad) unlock and the same
 
 ### Verified inside Basecamp, 2026-10-27
 
-The same request was repeated from the installed app (module 0.3.1 in Basecamp
+The same request was repeated from the installed app (module 0.3.2 in Basecamp
 0.3.2, plugin QML sandbox active):
 
 - **Check server** reported `Local server reachable at
   http://127.0.0.1:11434/v1/models · qwen2.5vl:3b`; Ollama logged
   `GET /v1/models` 200 from `127.0.0.1`.
 - **Read photo** produced, in Ollama's access log, `POST /v1/chat/completions`
-  from `127.0.0.1` with status 200 in 12.45 s and 1,806 prompt tokens (104
+  from `127.0.0.1` with status 200 in 14.27 s and 1,806 prompt tokens (104
   text, 1,702 image) plus 76 completion tokens — the same image and prompt as
-  the standalone run above.
+  the standalone run above. Seconds later the tab showed the model provenance
+  line (“Extracted by qwen2.5vl:3b on loopback · review the lines and the safety
+  gate.”), which is set only after the reply parses, matches the dish library
+  and the plan rebuilds; the session log held no QML errors. While the call was
+  in flight the page still painted “Working…” and its status line.
+- An earlier 0.3.1 build used the same backend request and got the same 200
+  reply (12.45 s on a cold model), but its tab kept reading cached
+  `modelState`/`modelReply` properties and stayed on “Working…”. That is why
+  0.3.2 returns the result from the slot itself.
 
 Before the backend transport, the same click failed because the sandbox blocks
 plugin QML networking; the probe and the chat request both reach the model now.

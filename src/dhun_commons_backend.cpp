@@ -1000,50 +1000,30 @@ QString DhunCommonsBackend::probeModelServer(QString endpoint)
     return jsonCompact(result);
 }
 
-void DhunCommonsBackend::finishModelRequest(const QString& state, const QJsonObject& payload)
-{
-    QJsonObject snapshot = payload;
-    snapshot.insert(QStringLiteral("state"), state);
-    setModelReply(jsonCompact(snapshot));
-    setModelState(state);
-}
-
 QString DhunCommonsBackend::startMenuPhoto(QString path,
                                            QString endpoint,
                                            QString model,
                                            QString prompt)
 {
-    if (m_modelReplyHandle) {
-        return jsonCompact(failureObject(QStringLiteral("A menu photo request is already running.")));
-    }
-
     QString chatUrl;
     QString error;
-    if (!loopbackChatUrl(endpoint, &chatUrl, &error)) {
-        finishModelRequest(QStringLiteral("failed"), failureObject(error));
+    if (!loopbackChatUrl(endpoint, &chatUrl, &error))
         return jsonCompact(failureObject(error));
-    }
 
     const QString name = model.trimmed();
     if (name.isEmpty()) {
-        const QString message = QStringLiteral("Name the local vision model first (for example qwen2.5vl:3b).");
-        finishModelRequest(QStringLiteral("failed"), failureObject(message));
-        return jsonCompact(failureObject(message));
+        return jsonCompact(failureObject(
+            QStringLiteral("Name the local vision model first (for example qwen2.5vl:3b).")));
     }
 
     QByteArray bytes;
     QString mime;
-    if (!readPhotoBytes(path, &bytes, &mime, &error)) {
-        finishModelRequest(QStringLiteral("failed"), failureObject(error));
+    if (!readPhotoBytes(path, &bytes, &mime, &error))
         return jsonCompact(failureObject(error));
-    }
 
     const QString instruction = prompt.trimmed();
-    if (instruction.isEmpty()) {
-        const QString message = QStringLiteral("The menu-reading instruction was empty.");
-        finishModelRequest(QStringLiteral("failed"), failureObject(message));
-        return jsonCompact(failureObject(message));
-    }
+    if (instruction.isEmpty())
+        return jsonCompact(failureObject(QStringLiteral("The menu-reading instruction was empty.")));
 
     QJsonObject imageUrl;
     imageUrl.insert(QStringLiteral("url"),
@@ -1055,12 +1035,12 @@ QString DhunCommonsBackend::startMenuPhoto(QString path,
     QJsonObject imagePart;
     imagePart.insert(QStringLiteral("type"), QStringLiteral("image_url"));
     imagePart.insert(QStringLiteral("image_url"), imageUrl);
-    QJsonArray content;
-    content.append(textPart);
-    content.append(imagePart);
+    QJsonArray contentParts;
+    contentParts.append(textPart);
+    contentParts.append(imagePart);
     QJsonObject message;
     message.insert(QStringLiteral("role"), QStringLiteral("user"));
-    message.insert(QStringLiteral("content"), content);
+    message.insert(QStringLiteral("content"), contentParts);
     QJsonArray messages;
     messages.append(message);
 
@@ -1070,106 +1050,94 @@ QString DhunCommonsBackend::startMenuPhoto(QString path,
     payload.insert(QStringLiteral("max_tokens"), 500);
     payload.insert(QStringLiteral("messages"), messages);
 
-    if (!m_modelNetwork)
-        m_modelNetwork = new QNetworkAccessManager(this);
-    if (!m_modelClock) {
-        m_modelClock = new QTimer(this);
-        m_modelClock->setSingleShot(true);
-        QObject::connect(m_modelClock, &QTimer::timeout, this, [this]() {
-            if (!m_modelReplyHandle)
-                return;
-            m_modelReplyHandle->abort();
-        });
-    }
-
+    QNetworkAccessManager network;
     QNetworkRequest request{QUrl(chatUrl)};
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
     request.setTransferTimeout(185000);
 
-    m_modelStartedMs = QDateTime::currentMSecsSinceEpoch();
-    setModelReply(QStringLiteral("{}"));
-    setModelState(QStringLiteral("busy"));
-    m_modelReplyHandle = m_modelNetwork->post(request, QJsonDocument(payload).toJson(QJsonDocument::Compact));
-    m_modelClock->start(190000);
+    const qint64 startedMs = QDateTime::currentMSecsSinceEpoch();
+    QNetworkReply* reply = network.post(request, QJsonDocument(payload).toJson(QJsonDocument::Compact));
 
-    QObject::connect(m_modelReplyHandle, &QNetworkReply::finished, this, [this, name]() {
-        QNetworkReply* reply = m_modelReplyHandle;
-        if (!reply)
-            return;
-        m_modelReplyHandle = nullptr;
-        if (m_modelClock)
-            m_modelClock->stop();
+    QEventLoop loop;
+    QTimer guard;
+    guard.setSingleShot(true);
+    QObject::connect(&guard, &QTimer::timeout, &loop, &QEventLoop::quit);
+    QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    guard.start(190000);
+    loop.exec();
+    guard.stop();
 
-        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        const QByteArray body = reply->readAll();
-        const QString networkError = reply->errorString();
-        const bool transportFailed = reply->error() != QNetworkReply::NoError && status == 0;
+    QJsonObject result;
+    result.insert(QStringLiteral("model"), name);
+    result.insert(QStringLiteral("seconds"),
+                  (QDateTime::currentMSecsSinceEpoch() - startedMs) / 1000.0);
+
+    if (!reply->isFinished()) {
+        reply->abort();
         reply->deleteLater();
-
-        QJsonObject result;
-        result.insert(QStringLiteral("httpStatus"), status);
+        result = failureObject(
+            QStringLiteral("The local model did not answer in time. It may still be loading the image."));
         result.insert(QStringLiteral("model"), name);
-        result.insert(QStringLiteral("seconds"),
-                      (QDateTime::currentMSecsSinceEpoch() - m_modelStartedMs) / 1000.0);
+        return jsonCompact(result);
+    }
 
-        if (transportFailed) {
-            const bool timedOut = networkError.contains(QStringLiteral("timed out"), Qt::CaseInsensitive)
-                || networkError.contains(QStringLiteral("Operation canceled"), Qt::CaseInsensitive);
-            result.insert(QStringLiteral("error"),
-                          timedOut
-                              ? QStringLiteral("The local model did not answer in time. It may still be loading the image.")
-                              : QStringLiteral("The local model server did not answer: ") + networkError);
-            finishModelRequest(QStringLiteral("failed"), result);
-            return;
-        }
+    const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    const QByteArray body = reply->readAll();
+    const QString networkError = reply->errorString();
+    const bool transportFailed = reply->error() != QNetworkReply::NoError && status == 0;
+    reply->deleteLater();
 
-        if (status < 200 || status >= 300) {
-            QString detail = QString::fromUtf8(body).left(300).trimmed();
-            if (detail.isEmpty())
-                detail = networkError;
-            result.insert(QStringLiteral("error"),
-                          QStringLiteral("The local model returned HTTP ") + QString::number(status)
-                              + (detail.isEmpty() ? QString() : QStringLiteral(": ") + detail));
-            finishModelRequest(QStringLiteral("failed"), result);
-            return;
-        }
+    result.insert(QStringLiteral("httpStatus"), status);
 
-        const QJsonObject parsed = QJsonDocument::fromJson(body).object();
-        const QJsonArray choices = parsed.value(QStringLiteral("choices")).toArray();
-        QString content;
-        if (!choices.isEmpty()) {
-            const QJsonValue value = choices.first().toObject()
-                                         .value(QStringLiteral("message")).toObject()
-                                         .value(QStringLiteral("content"));
-            if (value.isString()) {
-                content = value.toString();
-            } else if (value.isArray()) {
-                QStringList parts;
-                for (const QJsonValue& part : value.toArray()) {
-                    const QString text = part.toObject().value(QStringLiteral("text")).toString();
-                    if (!text.isEmpty())
-                        parts.append(text);
-                }
-                content = parts.join(QLatin1Char(' '));
+    if (transportFailed) {
+        result.insert(QStringLiteral("success"), false);
+        result.insert(QStringLiteral("error"),
+                      QStringLiteral("The local model server did not answer: ") + networkError);
+        return jsonCompact(result);
+    }
+
+    if (status < 200 || status >= 300) {
+        QString detail = QString::fromUtf8(body).left(300).trimmed();
+        if (detail.isEmpty())
+            detail = networkError;
+        result.insert(QStringLiteral("success"), false);
+        result.insert(QStringLiteral("error"),
+                      QStringLiteral("The local model returned HTTP ") + QString::number(status)
+                          + (detail.isEmpty() ? QString() : QStringLiteral(": ") + detail));
+        return jsonCompact(result);
+    }
+
+    const QJsonObject parsed = QJsonDocument::fromJson(body).object();
+    const QJsonArray choices = parsed.value(QStringLiteral("choices")).toArray();
+    QString content;
+    if (!choices.isEmpty()) {
+        const QJsonValue value = choices.first().toObject()
+                                     .value(QStringLiteral("message")).toObject()
+                                     .value(QStringLiteral("content"));
+        if (value.isString()) {
+            content = value.toString();
+        } else if (value.isArray()) {
+            QStringList parts;
+            for (const QJsonValue& part : value.toArray()) {
+                const QString text = part.toObject().value(QStringLiteral("text")).toString();
+                if (!text.isEmpty())
+                    parts.append(text);
             }
+            content = parts.join(QLatin1Char(' '));
         }
+    }
 
-        if (content.trimmed().isEmpty()) {
-            result.insert(QStringLiteral("error"),
-                          QStringLiteral("The local model returned no text. Check the model name and try again."));
-            finishModelRequest(QStringLiteral("failed"), result);
-            return;
-        }
+    if (content.trimmed().isEmpty()) {
+        result.insert(QStringLiteral("success"), false);
+        result.insert(QStringLiteral("error"),
+                      QStringLiteral("The local model returned no text. Check the model name and try again."));
+        return jsonCompact(result);
+    }
 
-        const QJsonObject usage = parsed.value(QStringLiteral("usage")).toObject();
-        if (!usage.isEmpty())
-            result.insert(QStringLiteral("usage"), usage);
-        result.insert(QStringLiteral("content"), content);
-        finishModelRequest(QStringLiteral("done"), result);
-    });
-
-    QJsonObject started;
-    started.insert(QStringLiteral("success"), true);
-    started.insert(QStringLiteral("url"), chatUrl);
-    return jsonCompact(started);
+    const QJsonObject usage = parsed.value(QStringLiteral("usage")).toObject();
+    if (!usage.isEmpty())
+        result.insert(QStringLiteral("usage"), usage);
+    result.insert(QStringLiteral("success"), true);
+    result.insert(QStringLiteral("content"), content);
+    return jsonCompact(result);
 }
