@@ -62,5 +62,31 @@ jobs:
           grep -q 'publishTelegramState' src/dhun_commons.rep
           grep -q 'publishTelegramState' src/dhun_commons_backend.cpp
           grep -q 'publishTelegramState' qml/Main.qml
+          grep -q 'readPhotoBase64' src/dhun_commons.rep
+          grep -q 'readPhotoBase64' src/dhun_commons_backend.cpp
           test -f qml/Main.qml
+          test -f qml/kitchen.js
+          test -f qml/pages/Kitchen.qml
+          test -f qml/assets/menu-sample.jpg
+          grep -q '"kitchen"' qml/Main.qml
           test -f tests/Flow.qml
+          test -f docs/KITCHEN.md
+          test -f docs/PUBLISHING.md
+
+  catalog:
+    name: Catalog generator
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax check
+        run: node --check scripts/make-catalog.mjs
+      - name: Validate published catalog, when present
+        run: |
+          if [ -f catalog/index.json ]; then
+            node scripts/make-catalog.mjs --check catalog
+          else
+            echo "No catalog/index.json yet; release steps are in docs/PUBLISHING.md."
+          fi

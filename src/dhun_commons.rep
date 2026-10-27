@@ -9,6 +9,7 @@ class DhunCommons
     SLOT(QString publishTelegramState(QString json))
     SLOT(QString telegramInbox())
     SLOT(QString ackTelegramMessage(QString id))
+    SLOT(QString readPhotoBase64(QString path))
 
     PROP(QString chainStatus="uninitialized" READONLY)
     PROP(QString chainNotice="" READONLY)

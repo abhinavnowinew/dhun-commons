@@ -2,6 +2,7 @@
 result
 result-*
 pm
+dist/
 
 # Build and editor noise
 .direnv/

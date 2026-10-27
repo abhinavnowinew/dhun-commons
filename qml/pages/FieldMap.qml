@@ -827,7 +827,7 @@ Item {
                             Rectangle {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 y: 40
-                                width: Math.min(58, labelText.implicitWidth + 10)
+                                width: Math.min(82, labelText.implicitWidth + 10)
                                 height: 18
                                 radius: 9
                                 color: "#12241AE6"

@@ -16,7 +16,14 @@ The **Field map** adds the physical layer: an embedded satellite studio showing 
 produce is grown, a role-aware field calendar for sowing, irrigation, compost and
 harvest work, short field clips and produce procurement straight from the map. Google
 Maps is optional and activated with a key supplied at runtime; without it the page
-falls back to a local plan view. See [docs/FIELD-MAP.md](docs/FIELD-MAP.md).
+falls back to a local plan view. Produce markers carry permanent ingredient names.
+See [docs/FIELD-MAP.md](docs/FIELD-MAP.md).
+
+The **Kitchen** tab turns a menu photo and a guest count into a sourcing plan from the
+farm map, a waste-part plan for stalks, leaves, roots and peels, seasonal native
+additions, and a guarded pantry of preserves over 20 days with a guest memorabilia
+label. The planner is deterministic and offline; a free local vision model is optional
+and restricted to loopback. See [docs/KITCHEN.md](docs/KITCHEN.md).
 
 ## What this build is
 
@@ -40,6 +47,11 @@ A **working demonstration** with two clearly separated layers:
   transfer changes, and queues `/say` messages into the room. It reads public data and
   the app snapshot only: no key material, no signatures, no transfers. See
   [docs/TELEGRAM.md](docs/TELEGRAM.md).
+- **Kitchen planner.** Menu transcription, per-head quantities, farm sourcing, waste
+  uses, native additions, food-safety gating and long-life preserves are deterministic
+  local logic. Market stock, plot estimates and grower names are rehearsal data. No
+  model is installed or bundled; the optional photo reader only calls a loopback
+  OpenAI-compatible endpoint, and no photo leaves the machine.
 - **DHN treasury rehearsal.** The proposal state machine, allowances, escrow accounting,
   conservation splits, role separation, room transcripts and ledger are real application
   logic running on deterministic local DHN data. Their `txid`s and signatures are demo
@@ -204,8 +216,12 @@ rebuild. Live Telegram delivery is not claimed until you run it with your own to
 4. **Projects** — switch to Dhun, open the seed-bank programme, compare three competing bids and propose an award.
 5. **Challenges** — claim a 72-hour sowing window as Dhun, file evidence, propose the bounty release and approve it from a second role.
 6. **Coordination room** — every proposal and execution appends a system message to the bound room. If the Telegram bridge is running, open **TELEGRAM RELAY**, post a queued `/say` message to the room or dismiss it, and press **Publish snapshot**.
-7. **Landscape** — filter the atlas by season and zone; covenants are enforced at release, not by the map.
-8. **Field map** — open the embedded satellite studio. Without a key it shows the local
+7. **Kitchen** — load the rabi sample, keep 24 guests and December, then plan. Read the
+   sourcing list by zone, the waste-part and native cards, tick the safety gate to
+   unlock cooked preserves, and read the >20-day pantry and memorabilia label. Choose a
+   menu photo or press **Read photo** only if you have a loopback vision model running.
+8. **Landscape** — filter the atlas by season and zone; covenants are enforced at release, not by the map.
+9. **Field map** — open the embedded satellite studio. Without a key it shows the local
    plan view. Add a Google Maps key from the studio header, then select a produce pin,
    mark field work, record or attach a clip and procure a lot. Purchases above the role
    allowance become proposals; field orders appear in the wallet state.
@@ -217,31 +233,35 @@ qml/
   Main.qml            application conductor, state machine and economy
   seed.js             deterministic rehearsal state
   logic.js            proposal, escrow, formatting and covenant logic
+  kitchen.js          menu parser, per-head planner, waste/native data, pantry safety
   data.js             landscape zones, seasons, ingredient catalogue and field activities
   theme.js            design tokens
   components/         cards, rows, pills, sheets, fields, guarded WebView host
-  pages/              Overview, Field map, Market, Projects, Challenges, Wallet, Room, Landscape
+  pages/              Overview, Field map, Kitchen, Market, Projects, Challenges, Wallet, Room, Landscape
   drawers/            proposal, purchase, treasury, allocation, project, challenge, about
   web/                bundled field studio (Google Maps, activities, clips, procurement)
   assets/produce/     generated produce photography
+  assets/menu-sample.jpg  synthetic, illustrative menu photo
 src/
   dhun_commons.rep    universal module interface (slots and properties)
-  dhun_commons_backend.*  LEZ wallet, accounts, balances and transfer slots
+  dhun_commons_backend.*  LEZ wallet, accounts, balances, transfer and photo-read slots
   icons/icon.png      module icon
 metadata.json         universal module metadata and lez_core dependency
 CMakeLists.txt        logos_module() build
-scripts/              local studio server
+scripts/              local studio server and catalog generator/validator
+catalog/              published catalog files, once a release is hosted
 telegram/             Telegram bridge: Bot API long poll, relay files, 8 tests
-docs/                 RFP proposal, field map guide, Telegram relay and demo notes
-tests/Flow.qml        headless 72-check flow harness
-.github/workflows/    CI: bridge tests, manifest checks and a secret guard
+docs/                 RFP proposal, field map, kitchen, publishing and demo notes
+tests/Flow.qml        headless 101-check flow harness
+.github/workflows/    CI: bridge tests, manifest and catalog checks, secret guard
 ```
 
 The packaged studio lives at `qml/web/` because the LGX includes `qml/`.
 
 See [docs/DEMO.md](docs/DEMO.md) for the full walkthrough, expected numbers and the
 list of simulated behaviour, [docs/FIELD-MAP.md](docs/FIELD-MAP.md) for Maps key
-setup, data limits and the camera caveat, and [docs/TELEGRAM.md](docs/TELEGRAM.md) for
+setup, data limits and the camera caveat, [docs/KITCHEN.md](docs/KITCHEN.md) for the
+kitchen planner and local model setup, and [docs/TELEGRAM.md](docs/TELEGRAM.md) for
 the relay's commands, files and token boundary.
 
 ## Publishing this repository
@@ -260,7 +280,15 @@ or, with the GitHub CLI:
 gh repo create dhun-commons --private --source . --remote origin --push
 ```
 
-CI runs on every push: the bridge tests, the manifest check and the secret guard. The
-guard fails the build if a Telegram token pattern, a Google Maps key pattern, or a
+Basecamp apps are discovered through a module **catalog**, not a central store. The
+catalog generator and validator are in `scripts/make-catalog.mjs`; the full release
+steps are in [docs/PUBLISHING.md](docs/PUBLISHING.md). In short: build the portable
+LGX, attach it to a public GitHub release, generate `catalog/logos-repo.json` and
+`catalog/index.json`, commit them, then add the raw descriptor URL in Basecamp
+Settings → Repositories. Nothing has been pushed or published from this machine, so
+there is no public catalog URL yet.
+
+CI runs on every push: bridge tests, the manifest/catalog checks and the secret guard.
+The guard fails the build if a Telegram token pattern, a Google Maps key pattern, or a
 wallet/env file is committed. Keep the bot token in your shell or a private file, never
 in the tree.

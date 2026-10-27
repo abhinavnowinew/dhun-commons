@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Window
+import "../qml/kitchen.js" as Kitchen
 
 Window {
     id: win
@@ -306,6 +307,68 @@ Window {
         check("relay post clears only that note", app.relayInbox.length === 1 && app.relayInbox[0].id === "RLY-2", app.relayInbox.length);
         app.relayDismiss("RLY-2");
         check("relay dismiss empties the queue", app.relayInbox.length === 0, app.relayInbox.length);
+
+        // 13. Kitchen planner: menu -> farm sourcing, waste parts, natives, >20-day pantry
+        app.navigate("kitchen");
+        check("kitchen tab is registered", app.pageOrder.indexOf("kitchen") !== -1 && app.activePage === "kitchen", app.activePage);
+        check("kitchen tab has page metadata", app.pageMeta.kitchen && app.pageMeta.kitchen.title === "Kitchen", app.pageMeta.kitchen ? app.pageMeta.kitchen.title : "missing");
+
+        var winter = Kitchen.sampleMenus[0];
+        var plan = Kitchen.buildPlan(app.state, { guests: winter.guests, month: winter.month, menuText: winter.text, now: 1761500000000 });
+        check("winter sample menu parses", plan.ok && plan.dishes.length === 6, plan.reason + " dishes=" + plan.dishes.length);
+        check("sourcing covers the mapped ingredients", plan.lines.length === 11, plan.lines.length);
+        check("sourcing is grouped by farm zone", plan.groups.length >= 3, plan.groups.length);
+        check("planning weight is computed", plan.totals.requiredKg > 15, plan.totals.requiredKg);
+
+        var sarsonLine = null;
+        for (var li = 0; li < plan.lines.length; ++li)
+            if (plan.lines[li].id === "sarson") sarsonLine = plan.lines[li];
+        check("unlisted produce falls back to a field plot", sarsonLine !== null && sarsonLine.status === "plot" && sarsonLine.estimated, sarsonLine ? sarsonLine.status : "missing");
+        check("plot fallback names the grower and price", sarsonLine !== null && sarsonLine.supplier.length > 0 && sarsonLine.price > 0, sarsonLine ? sarsonLine.supplier + " @" + sarsonLine.price : "missing");
+        check("every line carries a need and a stock label", plan.lines.every(function (line) { return line.needLabel.length > 0 && line.stockLabel.length > 0; }));
+
+        check("waste uses cover stalks, leaves and roots", plan.waste.length >= 8, plan.waste.length);
+        var sarsonWaste = plan.waste.filter(function (item) { return item.ingredientId === "sarson"; })[0];
+        var sarsonParts = sarsonWaste ? sarsonWaste.parts.map(function (part) { return part.part; }).join(" ") : "";
+        check("sarson waste names its stalk", sarsonParts.indexOf("Stalk") !== -1, sarsonParts);
+        check("waste parts carry a caution", plan.waste.every(function (item) {
+            return item.parts.every(function (part) { return part.use.length > 0 && part.caution.length > 0; });
+        }));
+
+        check("native additions are suggested", plan.natives.length === 3, plan.natives.length);
+        var moringa = plan.natives.filter(function (item) { return item.id === "moringa"; })[0];
+        check("moringa is paired with the menu", !!moringa && moringa.action.length > 0 && moringa.caution.length > 0, moringa ? moringa.pairing : "missing");
+        check("native notes avoid medical claims", plan.natives.every(function (item) {
+            var text = item.caution.toLowerCase();
+            return item.caution.length > 0 && text.indexOf("cure") === -1 && text.indexOf("treat ") === -1 && text.indexOf("heals") === -1;
+        }));
+
+        var driedRoti = plan.preserves.filter(function (item) { return item.id === "dried_roti"; })[0];
+        var citrusSalt = plan.preserves.filter(function (item) { return item.id === "citrus_salt"; })[0];
+        check("cooked leftovers are gated until checks pass", !!driedRoti && !driedRoti.allowed && driedRoti.blockers.length >= 3, driedRoti ? driedRoti.blockers.join(" | ") : "missing");
+        check("raw routes survive a closed gate", !!citrusSalt && citrusSalt.allowed, citrusSalt ? citrusSalt.allowed : "missing");
+        check("long-life route is at least 20 days", !!citrusSalt && citrusSalt.days >= 21, citrusSalt ? citrusSalt.days : "missing");
+        check("only allowed routes count as long life", plan.longLifePreserves.every(function (item) { return item.allowed && item.days >= 21; }), plan.longLifePreserves.length);
+        check("memorabilia is not for sale", !!plan.memorabilia && plan.memorabilia.notForSale === true);
+        check("memorabilia carries a batch code", !!plan.memorabilia && /^DHN-K-[A-Z2-9]{5}$/.test(plan.memorabilia.batchCode), plan.memorabilia ? plan.memorabilia.batchCode : "missing");
+
+        var openPlan = Kitchen.buildPlan(app.state, {
+            guests: winter.guests, month: winter.month, menuText: winter.text, now: 1761500000000,
+            safety: { cooledWithin2h: true, refrigerated: true, untouched: true, dehydrator: true }
+        });
+        var openRoti = openPlan.preserves.filter(function (item) { return item.id === "dried_roti"; })[0];
+        check("checked leftovers unlock cooked preserves", !!openRoti && openRoti.allowed, openRoti ? openRoti.blockers.join(" | ") : "missing");
+        check("open gate adds long-life routes", openPlan.longLifePreserves.length > plan.longLifePreserves.length, openPlan.longLifePreserves.length + " vs " + plan.longLifePreserves.length);
+
+        var unknown = Kitchen.buildPlan(app.state, { guests: 10, month: 12, menuText: "Khadvi Sabzi" });
+        check("unknown menu fails honestly", !unknown.ok && unknown.reason.length > 0, unknown.reason);
+
+        var modelReply = Kitchen.parseModelReply("```json\n{\"dishes\":[{\"name\":\"Bajra Roti\"},{\"name\":\"Moth Dal\"},{\"name\":\"Khadvi Sabzi\"}],\"servings\":18}\n```");
+        check("model reply parses fenced JSON", modelReply.ok && modelReply.dishes.length === 2 && modelReply.unmatched.length === 1, modelReply.dishes.length + "/" + modelReply.unmatched.length);
+        check("model reply keeps suggested servings", modelReply.servings === 18, modelReply.servings);
+        check("loopback endpoints are allowed", Kitchen.localEndpointAllowed("http://127.0.0.1:11434/v1") && Kitchen.localEndpointAllowed("http://localhost:8080/v1"));
+        check("remote model endpoints are refused", !Kitchen.localEndpointAllowed("https://api.example.com/v1") && !Kitchen.localEndpointAllowed("http://10.0.0.5:11434/v1"));
+        check("model URL joins the chat path", Kitchen.chatCompletionsUrl("http://127.0.0.1:11434/v1") === "http://127.0.0.1:11434/v1/chat/completions");
 
         console.log("SUMMARY checks=" + win.checks + " failures=" + win.failures + " supply=" + walletSum(app) + " issued=" + app.state.token.issued);
         finishTimer.start();

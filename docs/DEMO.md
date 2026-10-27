@@ -269,6 +269,28 @@ Expected: the studio status pill changes from **OPENING STUDIO** to **LIVE GOOGL
 STUDIO**; the native fallback shows **NATIVE FIELD DESK**. Field activity counts in the
 sidebar badge count today's unfinished work for the active role.
 
+### 9. Kitchen
+
+Open **Kitchen**. The page loads the rabi sample: 24 guests, December, six dishes.
+
+1. Press **Plan the menu**. The stats row should read 6 dishes, 11 farm lines, 45%
+   Market cover, an estimated cost near ₹3,483 and 6 allowed routes over 20 days.
+2. Read **Source from the farm map** by zone. A *Market lot* line has seeded stock; a
+   *field plot* line (sarson, gajar, kheera, ghee, dhaniya, pudina) is an estimate to
+   confirm with the grower. The group headers link to the farm map, and the Field map's
+   produce markers carry permanent names.
+3. Read **Waste parts → kitchen use** (stalks, roots, peels, bran, soaking water) and
+   **Native additions** (moringa, sangri, ker in December). Every line carries a
+   caution; none is a medical claim.
+4. In **Safety gate for excess food**, tick all four boxes. Before that, cooked routes
+   such as dried roti and vegetable pickle are shown as **BLOCKED** with reasons; raw
+   citrus-salt and dairy routes remain allowed. Plate waste is never preserved.
+5. Read **Pantry routes over 20 days** and the guest memorabilia label. The label says
+   **GUEST MEMORABILIA · NOT FOR SALE** and carries a deterministic batch code.
+6. Choose a PNG/JPEG/WebP photo or keep the synthetic sample. **Read photo** only works
+   against a loopback OpenAI-compatible vision server; without one the built-in planner
+   reads the typed lines and no model is called. See [KITCHEN.md](KITCHEN.md).
+
 ## What is real in this build
 
 - The LEZ testnet account panel: wallet creation on device, a locally produced recovery
@@ -288,6 +310,10 @@ sidebar badge count today's unfinished work for the active role.
   stock changes and field order records in the wallet state.
 - The embedded studio bridge: role, inventory, activities, status changes, produce
   selections and clip-update notes flow between the web studio and QML.
+- The kitchen planner: menu parsing, per-head quantities, sourcing lines, waste-part
+  guidance, native suggestions, safety gating, >20-day filtering and memorabilia
+  labeling are deterministic local logic. Photo reading is local-only when a loopback
+  vision model is running.
 - Google satellite tiles and geocoding, when a runtime key and network are present.
 
 ## What is simulated
@@ -313,7 +339,11 @@ sidebar badge count today's unfinished work for the active role.
 - Fiat settlement and supplier delivery. There is no external payment rail.
 - Field inventory, grower names, plots, prices, stock, activities, updates and clips.
   They are seeded or created locally; there is no farmer feed, live GPS, cross-user sync
-  or upload. Field orders and stock changes use the rehearsal ledger.
+  or upload. Field orders and stock changes use the rehearsal ledger. The Kitchen
+  sourcing plan reads the same seeded Market lots and field-plot estimates, so its
+  coverage and cost are planning figures, not live availability.
+- The sample menu photo is synthetic and illustrative. No local vision model is bundled,
+  installed or claimed to be running; the deterministic planner works without one.
 - Clip storage depends on the web view's IndexedDB support. Camera capture additionally
   depends on the host granting camera and microphone permission; Basecamp 0.2.3 does not
   declare the required usage descriptions.
@@ -326,9 +356,9 @@ and field records stay local.
 
 ## Automated checks
 
-The in-repo flow harness exercises 72 assertions across all proposal kinds, roles,
+The in-repo flow harness exercises 101 assertions across all proposal kinds, roles,
 escrows, covenants, supply conservation, the native field page, field orders, the
-studio bridge events and the Telegram relay queue:
+studio bridge events, the Telegram relay queue and the kitchen planner:
 
 ```sh
 export QML2_IMPORT_PATH=/Applications/LogosBasecamp.app/Contents/Resources/qt/qml
@@ -343,7 +373,7 @@ export QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software
 Expected final line:
 
 ```text
-qml: SUMMARY checks=72 failures=0 supply=170000 issued=170000
+qml: SUMMARY checks=101 failures=0 supply=170000 issued=170000
 ```
 
 The 170,000 supply is correct: the harness executes the 20,000 DHN Tranche C mint,
@@ -395,6 +425,9 @@ satellite studio is therefore checked live in Basecamp, not by this harness.
   plan view, which has no Google tiles, geocoding or clip capture.
 - The camera path is not verified in Basecamp: the app does not declare camera and
   microphone usage descriptions. Use **Attach a clip** or the native composer.
+- Kitchen photo reading needs a separate loopback vision server; no model ships with the
+  module. The backend reads PNG, JPEG and WebP up to 8 MiB and refuses HEIC. The QML
+  client refuses any endpoint that is not `127.0.0.1`, `localhost` or `[::1]`.
 - The Maps key is stored in the web view's `localStorage`. A `file://` studio cannot use
   website-referrer restrictions; use API restrictions only or local server mode. Rotate
   keys that were shared during testing. No key is included in the repository or LGX.
@@ -406,14 +439,19 @@ satellite studio is therefore checked live in Basecamp, not by this harness.
 | `qml/Main.qml` | Application conductor, proposal execution and economy |
 | `qml/seed.js` | Deterministic rehearsal state |
 | `qml/logic.js` | Proposal/escrow/covenant/formatting logic |
-| `qml/pages/` | Overview, Field map, Market, Projects, Challenges, Wallet, Room, Landscape |
+| `qml/pages/` | Overview, Field map, Kitchen, Market, Projects, Challenges, Wallet, Room, Landscape |
 | `qml/pages/FieldMap.qml` | Embedded studio host, bridge, native plan view and field calendar |
+| `qml/pages/Kitchen.qml` | Menu photo, model client, sourcing, waste/native cards, safety gate, pantry label |
+| `qml/kitchen.js` | Dish library, per-head planner, waste and native data, preserves and safety rules |
 | `qml/web/` | Bundled field studio (Maps, activities, clips, procurement) |
 | `qml/components/StudioWebView.qml` | Guarded QtWebView host with native fallback |
 | `qml/drawers/` | Proposal, purchase, treasury, allocation, project, challenge, about |
-| `src/dhun_commons.rep` | Universal module interface: wallet, refresh, transfer, verify slots |
-| `src/dhun_commons_backend.{h,cpp}` | LEZ wallet directory, account mapping, balances, transfers |
+| `src/dhun_commons.rep` | Universal module interface: wallet, refresh, transfer, verify and photo-read slots |
+| `src/dhun_commons_backend.{h,cpp}` | LEZ wallet directory, account mapping, balances, transfers, local photo reader |
 | `metadata.json`, `CMakeLists.txt` | Universal module metadata, `lez_core` dependency and build |
-| `tests/Flow.qml` | 72-check headless flow harness |
+| `scripts/make-catalog.mjs` | Generates and validates the public Basecamp catalog files |
+| `tests/Flow.qml` | 101-check headless flow harness |
 | `docs/FIELD-MAP.md` | Maps key setup, studio architecture, data limits and camera caveat |
+| `docs/KITCHEN.md` | Kitchen workflow, free local vision models, safety rules and limits |
+| `docs/PUBLISHING.md` | Catalog schema, release hosting and Basecamp repository setup |
 | `docs/RFP-005-proposal.md` | Production design and RFP submission draft |

@@ -20,6 +20,7 @@ public:
     QString publishTelegramState(QString json) override;
     QString telegramInbox() override;
     QString ackTelegramMessage(QString id) override;
+    QString readPhotoBase64(QString path) override;
 
     void onContextReady() override;
 

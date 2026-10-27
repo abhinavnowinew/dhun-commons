@@ -824,3 +824,49 @@ QString DhunCommonsBackend::ackTelegramMessage(QString id)
     result.insert(QStringLiteral("remaining"), static_cast<int>(kept.size()));
     return jsonCompact(result);
 }
+
+QString DhunCommonsBackend::readPhotoBase64(QString path)
+{
+    const QString requested = path.trimmed();
+    if (requested.isEmpty())
+        return jsonCompact(failureObject(QStringLiteral("Choose a menu photo first.")));
+
+    const QFileInfo info(requested);
+    const QString resolved = info.canonicalFilePath();
+    if (resolved.isEmpty() || !info.isFile())
+        return jsonCompact(failureObject(QStringLiteral("The chosen photo is not a readable file.")));
+
+    const qint64 maxBytes = 8 * 1024 * 1024;
+    if (info.size() <= 0)
+        return jsonCompact(failureObject(QStringLiteral("The chosen photo is empty.")));
+    if (info.size() > maxBytes)
+        return jsonCompact(failureObject(QStringLiteral("The photo is larger than 8 MB. Choose a smaller image.")));
+
+    const QString suffix = info.suffix().toLower();
+    QString mime;
+    if (suffix == QStringLiteral("png"))
+        mime = QStringLiteral("image/png");
+    else if (suffix == QStringLiteral("jpg") || suffix == QStringLiteral("jpeg"))
+        mime = QStringLiteral("image/jpeg");
+    else if (suffix == QStringLiteral("webp"))
+        mime = QStringLiteral("image/webp");
+    else
+        return jsonCompact(failureObject(QStringLiteral("Only PNG, JPEG or WebP menu photos can be read. Convert HEIC before choosing it.")));
+
+    QFile file(resolved);
+    if (!file.open(QIODevice::ReadOnly))
+        return jsonCompact(failureObject(QStringLiteral("The chosen photo could not be opened.")));
+    const QByteArray bytes = file.readAll();
+    file.close();
+    if (bytes.isEmpty())
+        return jsonCompact(failureObject(QStringLiteral("The chosen photo is empty.")));
+    if (bytes.size() > maxBytes)
+        return jsonCompact(failureObject(QStringLiteral("The photo is larger than 8 MB. Choose a smaller image.")));
+
+    QJsonObject result;
+    result.insert(QStringLiteral("success"), true);
+    result.insert(QStringLiteral("mime"), mime);
+    result.insert(QStringLiteral("bytes"), static_cast<double>(bytes.size()));
+    result.insert(QStringLiteral("base64"), QString::fromLatin1(bytes.toBase64()));
+    return jsonCompact(result);
+}

@@ -345,6 +345,13 @@ svg { width: 16px; height: 16px; fill: none; }
     font-size: 8px; font-weight: 600; border-radius: 7px; box-shadow: 0 4px 12px rgba(0,0,0,.35);
 }
 .leaflet-container .dhun-tip::before { border-top-color: rgba(12, 29, 20, 0.94); }
+.leaflet-container .dhun-produce-tip {
+    background: rgba(12, 29, 20, 0.92); border: 1px solid #55705A; color: #F4F7E9;
+    font-family: var(--sans); font-size: 8px; font-weight: 700; letter-spacing: 0.2px;
+    padding: 2px 6px; border-radius: 999px; box-shadow: 0 3px 9px rgba(8, 22, 14, 0.35);
+    white-space: nowrap; pointer-events: none;
+}
+.leaflet-container .dhun-produce-tip::before { display: none; }
 .map-panel.placing .leaflet-container { cursor: crosshair; }
 
 /* fallback pins */

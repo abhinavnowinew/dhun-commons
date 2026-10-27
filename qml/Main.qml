@@ -50,7 +50,7 @@ Item {
     property string toastText: ""
     property string toastTone: "ok"
 
-    readonly property var pageOrder: ["overview", "field", "market", "projects", "challenges", "wallet", "room", "landscape"]
+    readonly property var pageOrder: ["overview", "field", "kitchen", "market", "projects", "challenges", "wallet", "room", "landscape"]
     readonly property var pageMeta: ({
         overview: {
             title: "Overview",
@@ -61,6 +61,11 @@ Item {
             title: "Field map",
             subtitle: "Produce plots, field work and the calendar the three parties share",
             section: "Field"
+        },
+        kitchen: {
+            title: "Kitchen",
+            subtitle: "Menu photo to farm sourcing, waste-part uses and a guarded >20-day pantry",
+            section: "Kitchen"
         },
         market: {
             title: "Market",
@@ -1433,6 +1438,11 @@ Item {
                     onStudioUpdate: function (update) { app.ingestFieldUpdate(update) }
                     onStudioReady: function (info) { app.now = Date.now() }
                     onToast: function (text, tone) { app.showToast(text, tone) }
+                }
+
+                Kitchen {
+                    host: app
+                    app: app.state
                 }
 
                 Market {

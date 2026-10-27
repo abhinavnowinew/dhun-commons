@@ -684,11 +684,22 @@
             '<svg><use href="#i-leaf"/></svg>', function () { showSiteCard(); }, "Dhun at " + DATA.site.place);
 
         visible.forEach(function (item) {
-            leafletMarker("produce:" + item.id, item.plot.latitude, item.plot.longitude,
+            var marker = leafletMarker("produce:" + item.id, item.plot.latitude, item.plot.longitude,
                 "gm-produce" + (inSeasonNow(item) ? "" : " out") + (app.activeProduce === item.id ? " selected" : ""),
                 '<img src="' + esc(item.photo) + '" alt="' + esc(item.name) + '">',
                 function () { openProduce(item.id); },
                 item.name + " \u00B7 " + item.growerName + " \u00B7 " + stockLabel(item));
+            if (marker) {
+                marker.unbindTooltip();
+                marker.bindTooltip(item.name, {
+                    permanent: true,
+                    direction: "bottom",
+                    offset: [0, 6],
+                    opacity: 1,
+                    className: "dhun-produce-tip",
+                    interactive: false
+                });
+            }
         });
 
         app.activities.forEach(function (activity) {

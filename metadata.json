@@ -1,11 +1,11 @@
 {
   "name": "dhun_commons",
   "display_name": "Dhun Commons",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "ui_qml",
   "interface": "universal",
   "category": "community",
-  "description": "A three-party seasonal treasury: private multisig proposals, external DHN placement, project competition, cultivation windows and conservation covenants for Dhun's landscape, with live LEZ testnet accounts.",
+  "description": "A three-party seasonal treasury and field kitchen: private multisig proposals, external DHN placement, project competition, cultivation windows, farm sourcing, waste-part uses and a guarded long-life pantry for Dhun's landscape, with live LEZ testnet accounts.",
   "author": "Dhun Commons",
   "main": "dhun_commons_plugin",
   "view": "qml/Main.qml",

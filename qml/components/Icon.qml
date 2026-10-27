@@ -144,6 +144,28 @@ Canvas {
             line(s * 0.38, s * 0.18, s * 0.38, s * 0.74);
             line(s * 0.62, s * 0.28, s * 0.62, s * 0.84);
             dot(s * 0.5, s * 0.5, 1.7);
+        } else if (name === "kitchen") {
+            ctx.beginPath();
+            ctx.moveTo(s * 0.16, s * 0.44);
+            ctx.lineTo(s * 0.84, s * 0.44);
+            ctx.lineTo(s * 0.78, s * 0.8);
+            ctx.quadraticCurveTo(s * 0.76, s * 0.86, s * 0.68, s * 0.86);
+            ctx.lineTo(s * 0.32, s * 0.86);
+            ctx.quadraticCurveTo(s * 0.24, s * 0.86, s * 0.22, s * 0.8);
+            ctx.closePath();
+            ctx.stroke();
+            line(s * 0.12, s * 0.44, s * 0.88, s * 0.44);
+            line(s * 0.18, s * 0.38, s * 0.82, s * 0.38);
+            line(s * 0.5, s * 0.38, s * 0.5, s * 0.31);
+            dot(s * 0.5, s * 0.28, 1.4);
+            line(s * 0.12, s * 0.55, s * 0.2, s * 0.55);
+            line(s * 0.8, s * 0.55, s * 0.88, s * 0.55);
+            ctx.beginPath();
+            ctx.moveTo(s * 0.36, s * 0.22);
+            ctx.quadraticCurveTo(s * 0.32, s * 0.16, s * 0.38, s * 0.12);
+            ctx.moveTo(s * 0.56, s * 0.22);
+            ctx.quadraticCurveTo(s * 0.6, s * 0.16, s * 0.54, s * 0.12);
+            ctx.stroke();
         } else if (name === "landscape") {
             ctx.beginPath();
             ctx.moveTo(s * 0.1, s * 0.74);
