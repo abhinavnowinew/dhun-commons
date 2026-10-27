@@ -151,13 +151,14 @@ crisps, oil-and-salt vegetable pickle, dehydrated dal papad) unlock and the same
 
 ### Verified inside Basecamp, 2026-10-27
 
-The same request was repeated from the installed app (module 0.3.0 in Basecamp
+The same request was repeated from the installed app (module 0.3.1 in Basecamp
 0.3.2, plugin QML sandbox active):
 
 - **Check server** reported `Local server reachable at
-  http://127.0.0.1:11434/v1/models · qwen2.5vl:3b`.
+  http://127.0.0.1:11434/v1/models · qwen2.5vl:3b`; Ollama logged
+  `GET /v1/models` 200 from `127.0.0.1`.
 - **Read photo** produced, in Ollama's access log, `POST /v1/chat/completions`
-  from `127.0.0.1` with status 200 in 13.04 s and 1,806 prompt tokens (104
+  from `127.0.0.1` with status 200 in 12.45 s and 1,806 prompt tokens (104
   text, 1,702 image) plus 76 completion tokens — the same image and prompt as
   the standalone run above.
 

@@ -288,15 +288,17 @@ LGX, attach it to a public release (or static host), generate `logos-repo.json` 
 
 ### Public catalog
 
-The 0.3.0 catalog is live at
+The 0.3.1 catalog is live at
 **https://dhun-commons-atecxfewqi9.qoder.website/logos-repo.json** (public, unsigned).
 Add that URL in Basecamp → Settings → Repositories. The same host serves
-`index.json`, the icon and the 11 MB `.lgx`.
+`index.json`, the icon and the 11 MB `.lgx`. The 0.3.1 build routes the local
+vision-model request through the module backend, because Basecamp blocks network
+access from plugin QML.
 
 Verified on 2026-10-27 with unauthenticated HTTPS requests: the descriptor and index
 returned JSON, the icon matched its SHA-256, and the downloaded `.lgx` was
-11,065,234 bytes with SHA-256
-`4dc397f9bdf4474c353b995567c38bf7576d60c99f3ee2f8301b338933d18fa1`.
+11,078,132 bytes with SHA-256
+`a513d11b492dd8ce2d6e1796dafc1056ba87eff9d314c8fb8ade44927f0d75e5`.
 
 This is static catalog hosting only. It does not publish the source repository; the
 working tree still has no git remote.
