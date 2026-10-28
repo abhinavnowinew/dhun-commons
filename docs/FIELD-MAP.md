@@ -38,6 +38,27 @@ Google map.
 All field state is local rehearsal data. There is no server, no cross-user sharing, no
 live inventory feed, no GPS tracking and no chain submission behind the map.
 
+## Native view lifecycle
+
+On macOS, QtWebView draws into a native `NSView` that sits above the QML scene and
+ignores QML stacking. Dhun Commons therefore destroys the web view instead of trying to
+place anything over it:
+
+- The page computes effective visibility by walking its QML ancestors and checking the
+  host window (visible and not minimised). When another Basecamp app, a hidden module
+  view or a minimised window takes over, the web view is unloaded.
+- Any QML drawer or sheet — purchase, profile, treasury, proposal, project, challenge,
+  about — sets `hostOverlay`, which unloads the web view before the drawer animates in.
+  The same applies to the page's native **Mark work** sheet. This is why the purchase
+  drawer opened from a produce lot is no longer painted underneath the map.
+- Returning to the page starts a fresh studio session. Viewport, search and open map
+  cards are not preserved across an unload.
+
+The bundled studio also marks itself embedded (`body.embedded`) and uses a fixed
+three-row grid — topbar, map, produce dock — so the procurement dock stays on screen
+under the map instead of being pushed below the fold. On a very narrow host the side
+rail is hidden and the dock remains.
+
 ## Opening the map
 
 1. Install the module (see the [README](../README.md)) and restart Basecamp.

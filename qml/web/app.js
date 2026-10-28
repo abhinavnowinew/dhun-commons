@@ -6,6 +6,7 @@
     var CONFIG = window.DHUN_CONFIG || {};
     var params = new URLSearchParams(window.location.search);
     var embedded = params.get("embedded") === "1";
+    if (embedded) document.body.classList.add("embedded");
     var STORAGE_KEY = "dhun.studio.v1";
     var KEY_STORAGE = "dhun.maps.key";
     var NOTICE_KEY = "dhun.keyNotice.dismissed";

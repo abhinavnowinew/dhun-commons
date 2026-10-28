@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
+import QtQuick.Window
 import QtCore
 import "theme.js" as Theme
 import "logic.js" as Logic
@@ -39,6 +40,12 @@ Item {
     property bool webStudioEnabled: true
     property int purchaseInitialQty: 1
     property var seenStudioUpdates: ({})
+
+    // Any QML sheet or drawer sits below QtWebView's native macOS view, so the
+    // Field map unloads its web view while one is open.
+    readonly property bool overlayOpen: profileOpen || aboutOpen || treasuryOpen || allocateOpen ||
+                                        activeProposal !== null || activeOffer !== null ||
+                                        activeProject !== null || activeChallenge !== null
 
     readonly property bool relayHosted: typeof logos !== "undefined" && logos !== null
     property var relayBackend: null
@@ -1511,7 +1518,7 @@ Item {
 
         return {
             app: "dhun_commons",
-            version: "0.4.0",
+            version: "0.4.1",
             page: activePage,
             role: activeRole,
             room: "room-msig",
@@ -1698,6 +1705,7 @@ Item {
                     now: app.now
                     activeRole: app.activeRole
                     webEnabled: app.webStudioEnabled
+                    hostOverlay: app.overlayOpen
                     onPurchase: function (offer) { app.openFieldOffer(offer) }
                     onAddActivity: function (spec) { app.addFieldActivity(spec) }
                     onSetActivityStatus: function (id, status) { app.setFieldActivityStatus(id, status) }

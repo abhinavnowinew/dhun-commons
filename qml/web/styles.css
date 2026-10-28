@@ -682,3 +682,86 @@ svg { width: 16px; height: 16px; fill: none; }
     .modal-foot { flex-wrap: wrap; }
     .share-hint { flex-basis: 100%; }
 }
+
+/* ---------- Embedded studio (inside the Basecamp field page) ----------
+   The page is much shorter than a browser window. Keep the produce dock on
+   screen instead of pushing it below the map, and give the map the rest. */
+body.embedded { overflow: hidden; }
+body.embedded .app {
+    height: 100vh;
+    grid-template-rows: 54px minmax(0, 1fr) 196px;
+    overflow: hidden;
+}
+body.embedded .topbar { height: 54px; padding: 0 12px; gap: 10px; }
+body.embedded .brand { min-width: 0; }
+body.embedded .brand-name { font-size: 18px; }
+body.embedded .brand-sub { display: none; }
+body.embedded .top-actions .btn-ghost.light:first-child span { display: none; }
+body.embedded .workspace {
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 10px;
+    padding: 10px 12px;
+    min-height: 0;
+}
+body.embedded .map-panel { height: auto; min-height: 0; }
+body.embedded .side-rail { min-height: 0; grid-template-rows: auto minmax(0, 1fr); gap: 9px; }
+body.embedded .calendar-card { padding: 11px 12px 10px; }
+body.embedded .calendar-stats { margin: 7px 0; }
+body.embedded .cal-day { height: 23px; font-size: 9px; }
+body.embedded .calendar-add { margin-top: 6px; height: 24px; }
+body.embedded .agenda-card { min-height: 0; padding: 11px 12px; }
+body.embedded .agenda-list { margin-top: 6px; }
+body.embedded .dock {
+    height: auto;
+    min-height: 0;
+    margin: 0 12px 10px;
+    padding: 8px 12px;
+}
+body.embedded .dock-head { min-height: 34px; gap: 9px; }
+body.embedded .dock-title { min-width: 160px; }
+body.embedded .dock-title h2 { font-size: 17px; }
+body.embedded .dock-updated { display: none; }
+body.embedded .dock-summary strong { font-size: 22px; }
+body.embedded .produce-scroller { padding-top: 6px; }
+body.embedded .produce-card { width: 172px; height: 128px; }
+body.embedded .produce-image { height: 52px; }
+body.embedded .produce-body { padding: 5px 8px 6px; }
+body.embedded .produce-name { font-size: 14px; }
+body.embedded .produce-price { font-size: 14px; }
+body.embedded .produce-grower { display: none; }
+
+@media (max-width: 760px) {
+    body.embedded .app { grid-template-rows: 54px minmax(0, 1fr) 196px; }
+    body.embedded .workspace { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    body.embedded .map-panel { min-height: 190px; }
+    body.embedded .side-rail { display: none; }
+}
+
+body.embedded .topbar { flex-wrap: nowrap; }
+body.embedded .search-wrap { order: 0; flex: 1 1 190px; max-width: 280px; min-width: 0; }
+body.embedded .workspace {
+    display: grid;
+    align-items: stretch;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    grid-template-rows: minmax(0, 1fr);
+}
+body.embedded .map-panel { min-height: 200px; }
+body.embedded .side-rail { grid-template-columns: minmax(0, 1fr); }
+
+body.embedded .app { display: grid; }
+
+body.embedded .app { grid-template-rows: 54px minmax(0, 1fr) 210px; }
+body.embedded .brand-name { white-space: nowrap; }
+body.embedded .side-rail { grid-template-rows: auto minmax(70px, 1fr); }
+body.embedded .calendar-card { padding: 9px 10px 8px; }
+body.embedded .calendar-grid .cal-day { height: 21px; font-size: 8.5px; }
+body.embedded .produce-card { height: 118px; }
+body.embedded .produce-image { height: 46px; }
+body.embedded .dock { padding: 7px 12px; }
+body.embedded .dock-head { min-height: 32px; }
+
+body.embedded .brand-name { font-size: 16px; }
+body.embedded .brand-name span { display: none; }
+body.embedded .side-rail { grid-template-rows: auto; }
+body.embedded .agenda-card { display: none; }
+body.embedded .calendar-card { align-self: start; }

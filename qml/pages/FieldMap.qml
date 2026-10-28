@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
+import QtQuick.Window
 import "../theme.js" as Theme
 import "../logic.js" as Logic
 import "../data.js" as Data
@@ -13,6 +14,24 @@ Item {
     property real now: Date.now()
     property string activeRole: "funder"
     property bool webEnabled: true
+    property bool hostOverlay: false
+
+    // Item.visible is only this page's own flag. Walk the ancestors and the
+    // host window as well: Basecamp keeps the module alive when another app or
+    // another module view is in front, and the native web view would stay on
+    // top of it. Destroy the web view whenever any of that is true.
+    readonly property bool stageVisible: {
+        var node = page;
+        while (node) {
+            if (!node.visible) return false;
+            node = node.parent;
+        }
+        var win = Window.window;
+        if (!win) return true;
+        if (win.visibility === Window.Minimized) return false;
+        return win.visible;
+    }
+    readonly property bool studioPageActive: stageVisible && !hostOverlay && !composerOpen
 
     property bool studioRequested: false
     property string sourceMode: "bundled"
@@ -653,7 +672,7 @@ Item {
                     id: studioWebView
                     anchors.fill: parent
                     started: page.studioRequested && page.webEnabled
-                    pageActive: page.visible
+                    pageActive: page.studioPageActive
                     visible: page.webEnabled && !studioWebView.failed
                     onPageLoaded: page.callStudio("snapshot", [])
                 }
