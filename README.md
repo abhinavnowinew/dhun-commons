@@ -336,20 +336,23 @@ LGX, attach it to a public release (or static host), generate `logos-repo.json` 
 
 ### Public catalog
 
-The 0.4.1 catalog is live at
+The 0.4.2 catalog is live at
 **https://dhun-commons-atecxfewqi9.qoder.website/logos-repo.json** (public, unsigned).
 Add that URL in Basecamp → Settings → Repositories. The same host serves
-`index.json`, the icon and the 11 MB `.lgx`. The 0.4.1 build adds the native-view
+`index.json`, the icon and the 11 MB `.lgx`. The 0.4.2 build adds the native-view
 fix: the field map unloads its web view whenever a drawer, sheet or another Basecamp
 app takes the front, and the embedded studio keeps the procurement dock in its own
-grid row so it cannot sit under the map. The **Node & rewards** tab, steward
-profiles and the local vision reply path from 0.4.0 are unchanged.
+grid row so it cannot sit under the map. The visibility gate reads the host
+window's `visibility`, not `visible`, because Basecamp hosts module QML in a
+`QQuickWidget` whose offscreen window never reports itself visible. The **Node &
+rewards** tab, steward profiles and the local vision reply path from 0.4.0 are
+unchanged.
 
 Verified on 2026-10-28 with unauthenticated HTTPS requests: the descriptor and index
-returned version 0.4.1, the icon matched its SHA-256, and the downloaded `.lgx` was
-11,091,921 bytes with SHA-256
-`6cdde01621f22debfc1d6530e5ac7033c0e2e2d90286cb9567a05c88aafb9392` (root hash
-`da04159fd3be546ecc0e5482d28b20dfaa6c29209a470bda4abf0001a9482f65`).
+returned version 0.4.2, the icon matched its SHA-256, and the downloaded `.lgx` was
+11,092,042 bytes with SHA-256
+`9dab9acb004a0b5c67490cf4090abee47e513cf26e4b47c6e3025a6a7d1ef045` (root hash
+`dac2de7df66d57de04949d59f11212634452df941385f3b679022bf40fdaed95`).
 
 This is static catalog hosting only. It does not publish the source repository; the
 working tree still has no git remote.

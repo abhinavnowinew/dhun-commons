@@ -1518,7 +1518,7 @@ Item {
 
         return {
             app: "dhun_commons",
-            version: "0.4.1",
+            version: "0.4.2",
             page: activePage,
             role: activeRole,
             room: "room-msig",

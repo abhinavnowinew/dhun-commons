@@ -44,9 +44,12 @@ On macOS, QtWebView draws into a native `NSView` that sits above the QML scene a
 ignores QML stacking. Dhun Commons therefore destroys the web view instead of trying to
 place anything over it:
 
-- The page computes effective visibility by walking its QML ancestors and checking the
-  host window (visible and not minimised). When another Basecamp app, a hidden module
-  view or a minimised window takes over, the web view is unloaded.
+- The page computes effective visibility by walking its QML ancestors and reading the
+  host window's `visibility`. When another Basecamp app, a hidden module view or a
+  minimised window takes over, the web view is unloaded. Basecamp hosts module QML in a
+  `QQuickWidget`, whose offscreen window keeps `visible` false even while on screen —
+  it only updates `visibility` (Windowed when shown, Hidden when the widget is hidden),
+  so the gate must not read `visible`. Reading it unloaded the map permanently.
 - Any QML drawer or sheet — purchase, profile, treasury, proposal, project, challenge,
   about — sets `hostOverlay`, which unloads the web view before the drawer animates in.
   The same applies to the page's native **Mark work** sheet. This is why the purchase

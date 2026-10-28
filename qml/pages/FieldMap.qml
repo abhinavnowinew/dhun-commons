@@ -28,8 +28,10 @@ Item {
         }
         var win = Window.window;
         if (!win) return true;
-        if (win.visibility === Window.Minimized) return false;
-        return win.visible;
+        // Basecamp hosts module QML in a QQuickWidget. That offscreen window
+        // keeps visible=false even while shown, but it does track Windowed when
+        // the widget is shown and Hidden when it is hidden, so read visibility.
+        return win.visibility !== Window.Hidden && win.visibility !== Window.Minimized;
     }
     readonly property bool studioPageActive: stageVisible && !hostOverlay && !composerOpen
 
