@@ -68,7 +68,7 @@ Item {
     readonly property int pendingRewardCount: state ? Rewards.pendingCount(state) : 0
     readonly property var catalog: state && state.catalog ? state.catalog : null
 
-    readonly property var pageOrder: ["overview", "field", "kitchen", "market", "projects", "challenges", "wallet", "node", "room", "landscape"]
+    readonly property var pageOrder: ["overview", "field", "kitchen", "market", "projects", "challenges", "wallet", "node", "room", "landscape", "case"]
     readonly property var pageMeta: ({
         overview: {
             title: "Overview",
@@ -119,6 +119,11 @@ Item {
             title: "Landscape",
             subtitle: "Seasonal food, materials and the covenants that conserve them",
             section: "Land"
+        },
+        case: {
+            title: "The 500-acre case",
+            subtitle: "Why the proof matters, what opacity costs, and what this stack does",
+            section: "Story"
         }
     })
     readonly property var meta: pageMeta[activePage] ? pageMeta[activePage] : pageMeta.overview
@@ -1846,6 +1851,10 @@ Item {
                     activeRole: app.activeRole
                     onNavigate: function (page) { app.navigate(page) }
                     onOpenProject: function (project) { app.openProject(project) }
+                }
+
+                Case {
+                    onNavigate: function (page) { app.navigate(page) }
                 }
             }
         }

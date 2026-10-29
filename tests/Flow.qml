@@ -320,6 +320,9 @@ Window {
         check("sourcing covers the mapped ingredients", plan.lines.length === 11, plan.lines.length);
         check("sourcing is grouped by farm zone", plan.groups.length >= 3, plan.groups.length);
         check("planning weight is computed", plan.totals.requiredKg > 15, plan.totals.requiredKg);
+        check("total and per-person estimates are exposed", plan.totals.cost > 0 && plan.totals.perPersonCost > 0 && plan.totals.perPersonCostInr.indexOf("₹") === 0, plan.totals.costInr + " / " + plan.totals.perPersonCostInr);
+        var itemizedTotal = plan.lines.reduce(function (sum, line) { return sum + line.cost; }, 0);
+        check("total equals itemized source costs", Math.abs(itemizedTotal - plan.totals.cost) < 0.01, itemizedTotal + " vs " + plan.totals.cost);
 
         var sarsonLine = null;
         for (var li = 0; li < plan.lines.length; ++li)
@@ -327,6 +330,13 @@ Window {
         check("unlisted produce falls back to a field plot", sarsonLine !== null && sarsonLine.status === "plot" && sarsonLine.estimated, sarsonLine ? sarsonLine.status : "missing");
         check("plot fallback names the grower and price", sarsonLine !== null && sarsonLine.supplier.length > 0 && sarsonLine.price > 0, sarsonLine ? sarsonLine.supplier + " @" + sarsonLine.price : "missing");
         check("every line carries a need and a stock label", plan.lines.every(function (line) { return line.needLabel.length > 0 && line.stockLabel.length > 0; }));
+
+        var partialState = JSON.parse(JSON.stringify(app.state));
+        var bajraOffer = partialState.offers.filter(function (offer) { return offer.kind === "produce" && offer.ingredientId === "bajra"; })[0];
+        if (bajraOffer) bajraOffer.stock = 0.5;
+        var partialPlan = Kitchen.buildPlan(partialState, { guests: 24, month: 12, menuText: "Bajra Roti", now: 1761500000000 });
+        var partialBajra = partialPlan.lines.filter(function (line) { return line.id === "bajra"; })[0];
+        check("partial market lots include an estimated top-up", !!partialBajra && partialBajra.status === "partial" && partialBajra.marketCost > 0 && partialBajra.estimatedCost > 0 && Math.abs(partialBajra.cost - partialBajra.marketCost - partialBajra.estimatedCost) < 0.01, partialBajra ? partialBajra.cost + " / " + partialBajra.marketCost + " / " + partialBajra.estimatedCost : "missing");
 
         check("waste uses cover stalks, leaves and roots", plan.waste.length >= 8, plan.waste.length);
         var sarsonWaste = plan.waste.filter(function (item) { return item.ingredientId === "sarson"; })[0];
@@ -367,6 +377,14 @@ Window {
         var modelReply = Kitchen.parseModelReply("```json\n{\"dishes\":[{\"name\":\"Bajra Roti\"},{\"name\":\"Moth Dal\"},{\"name\":\"Khadvi Sabzi\"}],\"servings\":18}\n```");
         check("model reply parses fenced JSON", modelReply.ok && modelReply.dishes.length === 2 && modelReply.unmatched.length === 1, modelReply.dishes.length + "/" + modelReply.unmatched.length);
         check("model reply keeps suggested servings", modelReply.servings === 18, modelReply.servings);
+        var strictReply = Kitchen.parseModelReply('{"dishes":["Bajra Roti","Moringa"]}', { allowExtras: false });
+        check("local AI output cannot add unplanned extra ingredients", strictReply.matched === 1 && strictReply.extras.length === 0 && strictReply.unmatched.length === 1, strictReply.matched + "/" + strictReply.extras.length + "/" + strictReply.unmatched.length);
+        var doubledPlan = Kitchen.buildPlan(app.state, { guests: 48, month: winter.month, menuText: winter.text, now: 1761500000000 });
+        var winterBajra = plan.lines.filter(function (line) { return line.id === "bajra"; })[0];
+        var doubledBajra = doubledPlan.lines.filter(function (line) { return line.id === "bajra"; })[0];
+        check("changing guests scales ingredient requirements", !!winterBajra && !!doubledBajra && doubledBajra.gramsTotal === winterBajra.gramsTotal * 2 && doubledPlan.guests === 48, doubledBajra ? doubledBajra.gramsTotal + " g" : "missing");
+        var kitchenPrompt = Assistant.kitchenMessages("vegetarian lunch", 24, 12, Kitchen.dishChoices(), [{ title: "Bajra", stock: 12, unit: "kg", pricePerUnit: 55 }]);
+        check("local AI context includes guest and lot data", kitchenPrompt[1].content.indexOf('"guests":24') !== -1 && kitchenPrompt[1].content.indexOf('"listedProduceLots"') !== -1, kitchenPrompt[1].content.length);
         check("loopback endpoints are allowed", Kitchen.localEndpointAllowed("http://127.0.0.1:11434/v1") && Kitchen.localEndpointAllowed("http://localhost:8080/v1"));
         check("remote model endpoints are refused", !Kitchen.localEndpointAllowed("https://api.example.com/v1") && !Kitchen.localEndpointAllowed("http://10.0.0.5:11434/v1"));
         check("model URL joins the chat path", Kitchen.chatCompletionsUrl("http://127.0.0.1:11434/v1") === "http://127.0.0.1:11434/v1/chat/completions");
@@ -465,6 +483,14 @@ Window {
               Assistant.localAnswer(app, "How do I earn DHN?").indexOf("No OpenRouter key") === -1 &&
               Assistant.localAnswer(app, "What is the weather?").indexOf("no model was called") !== -1,
               "local answer checked");
+
+        // 15. The 500-acre case page
+        app.navigate("case");
+        check("case tab is registered", app.pageOrder.indexOf("case") !== -1 && app.activePage === "case", app.activePage);
+        check("case tab has page metadata", app.pageMeta.case && app.pageMeta.case.title === "The 500-acre case", app.pageMeta.case ? app.pageMeta.case.title : "missing");
+        check("case tab is the last workspace entry", app.pageOrder.length === 11 && app.pageOrder[10] === "case", app.pageOrder.join(","));
+        app.navigate("overview");
+        check("case page leaves the workspace intact", app.activePage === "overview" && app.state.people.length === people0 + 1, app.activePage);
 
         console.log("SUMMARY checks=" + win.checks + " failures=" + win.failures + " supply=" + walletSum(app) + " issued=" + app.state.token.issued);
         finishTimer.start();

@@ -23,20 +23,20 @@ Maps is optional and activated with a key supplied at runtime; without it the pa
 falls back to a local plan view. Produce markers carry permanent ingredient names.
 See [docs/FIELD-MAP.md](docs/FIELD-MAP.md).
 
-The **Kitchen** tab turns a menu photo, a typed dish or a mood into a sourcing plan from
-the farm map, a waste-part plan for stalks, leaves, roots and peels, zero-waste cooking
-steps, seasonal native additions, and a guarded pantry of preserves over 20 days with a
-guest memorabilia label. Free text such as "I feel cold and tired, lunch for 20" is read
-by a deterministic mood/season matcher; the planner itself stays offline. A free local
-vision model and an optional OpenRouter model are additive and never replace the local
-safety gate. See [docs/KITCHEN.md](docs/KITCHEN.md).
+The **Kitchen** tab turns a meal request into a reviewed menu, guest-scaled sourcing plan,
+itemized estimated cost and per-person cost, waste-use plan, and guarded pantry routes.
+Ollama can suggest dishes from the app's library using local inference only; quantities,
+listed-lot coverage, prices and safety gates are calculated by the deterministic planner.
+If local inference is unavailable, the built-in planner remains available and Kitchen does
+not fall back to a remote provider. See [docs/KITCHEN.md](docs/KITCHEN.md).
 
 The **Ask Dhun** assistant sits on top of every section. It reads the same reward rules
 and rehearsal state as the Node & rewards tab, lists concrete DHN actions for today, and
-can answer free-form questions through OpenRouter when a key is configured at runtime.
-The same model path reviews a steward's pasted background or text CV and suggests which
-existing programmes fit; it can only return project ids that are already in the app, and
-an allocation still has to be proposed and signed. See
+prefers a local Ollama-compatible model when one is running. OpenRouter is an optional
+remote fallback when no local model is available and a key is configured. The same model
+path reviews a steward's pasted background or text CV and suggests which existing
+programmes fit; it can only return project ids that are already in the app, and an
+allocation still has to be proposed and signed. See
 [Assistant and OpenRouter](#assistant-and-openrouter).
 
 The **Node & rewards** tab reports the Logos Messaging node and LEZ sequencer exactly as
@@ -67,15 +67,16 @@ A **working demonstration** with two clearly separated layers:
   transfer changes, and queues `/say` messages into the room. It reads public data and
   the app snapshot only: no key material, no signatures, no transfers. See
   [docs/TELEGRAM.md](docs/TELEGRAM.md).
-- **Kitchen planner.** Menu transcription, per-head quantities, farm sourcing, waste
-  uses, zero-waste steps, native additions, food-safety gating and long-life preserves
-  are deterministic local logic. Market stock, plot estimates and grower names are
-  rehearsal data. No model is installed or bundled; the optional photo reader only calls
-  a loopback OpenAI-compatible endpoint, and no photo leaves the machine.
-- **Assistant and profile review.** The built-in action list and mood matcher are local
-  logic. OpenRouter is called only when a key is supplied at runtime through the
-  environment or a private config file; prompts then leave the device. The key is never
-  written to the repository, QML or the rehearsal state.
+- **Kitchen planner.** Local Ollama suggests allowed dishes; menu parsing, guest-scaled
+  quantities, farm sourcing, itemized estimates, per-person totals, waste uses, native
+  additions and food-safety gating are deterministic local logic. Market stock and
+  grower/plot records are rehearsal data, not live inventory. Kitchen never sends menu
+  prompts to a remote model; photo reading also uses loopback only.
+- **Assistant and profile review.** Built-in guidance is local logic. When an
+  OpenAI-compatible server is available on loopback, Ask Dhun uses it first; prompts and
+  context stay on this device. OpenRouter is used only when no local server responds and
+  a key is supplied at runtime through the environment or a private config file; prompts
+  then leave the device. The key is never written to the repository, QML or rehearsal state.
 - **DHN treasury rehearsal.** The proposal state machine, allowances, escrow accounting,
   conservation splits, role separation, room transcripts and ledger are real application
   logic running on deterministic local DHN data. Their `txid`s and signatures are demo
@@ -245,8 +246,12 @@ behind it:
 - **Built-in guidance (always available, offline).** It reads the reward rules and the
   local rehearsal state, lists today's grounded actions, and answers common questions
   about DHN, the kitchen and profiles without calling a model.
-- **OpenRouter (optional, remote).** Free-form questions, model-assisted kitchen menus
-  and profile capability reviews are sent to
+- **Local Ollama first.** Ask Dhun discovers models from the default loopback endpoint
+  `http://127.0.0.1:11434/v1` and uses the first installed model. Set
+  `DHUN_LOCAL_MODEL_ENDPOINT` or `DHUN_LOCAL_MODEL` to choose another loopback-compatible
+  server or model. The app rejects non-loopback local endpoints.
+- **OpenRouter (optional, remote fallback).** Only when no local model responds,
+  free-form questions and profile reviews can go to
   `https://openrouter.ai/api/v1/chat/completions`. The model defaults to
   `openai/gpt-4o` and can be changed with `OPENROUTER_MODEL` or the config file.
 
@@ -276,10 +281,10 @@ are `OPENROUTER_SITE_URL` and `OPENROUTER_SITE_NAME`, sent as the OpenRouter ref
 and title headers. The endpoint is fixed; there is no setting that would send the key
 to another host.
 
-Without a key the assistant and the kitchen's **Plan it** path still work, the kitchen's
-**Ask OpenRouter** button returns an explanatory error, and the profile check does not
-run. Each reply is labelled with its source: built-in guidance, loopback vision model,
-or OpenRouter plus the model id and elapsed time.
+With no model available, built-in guidance and the kitchen's **Plan it** path still work.
+Each model reply is labelled with its source: local Ollama, the loopback vision model, or
+OpenRouter, plus the model id and elapsed time. A local model is preferred even if an
+OpenRouter key exists; the remote key is not read or used while local inference works.
 
 ### What leaves the device
 

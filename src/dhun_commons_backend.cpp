@@ -1205,27 +1205,173 @@ DhunCommonsBackend::AiConfig DhunCommonsBackend::aiConfig() const
     return cfg;
 }
 
+QJsonObject DhunCommonsBackend::localModelInfo()
+{
+    QString endpoint = qEnvironmentVariable("DHUN_LOCAL_MODEL_ENDPOINT").trimmed();
+    if (endpoint.isEmpty())
+        endpoint = QStringLiteral("http://127.0.0.1:11434/v1");
+
+    QString chatUrl;
+    QString error;
+    if (!loopbackChatUrl(endpoint, &chatUrl, &error))
+        return {};
+
+    const QJsonObject probe = QJsonDocument::fromJson(probeModelServer(endpoint).toUtf8()).object();
+    if (!probe.value(QStringLiteral("success")).toBool())
+        return {};
+
+    const QJsonArray models = probe.value(QStringLiteral("models")).toArray();
+    QString model = qEnvironmentVariable("DHUN_LOCAL_MODEL").trimmed();
+    if (model.isEmpty() && !models.isEmpty())
+        model = models.first().toString().trimmed();
+    if (model.isEmpty())
+        return {};
+
+    bool modelAvailable = false;
+    for (const QJsonValue& value : models) {
+        if (value.toString() == model) {
+            modelAvailable = true;
+            break;
+        }
+    }
+    if (!modelAvailable)
+        return {};
+
+    QJsonObject result;
+    result.insert(QStringLiteral("success"), true);
+    result.insert(QStringLiteral("provider"), QStringLiteral("ollama"));
+    result.insert(QStringLiteral("model"), model);
+    result.insert(QStringLiteral("endpoint"), endpoint);
+    return result;
+}
+
+QString DhunCommonsBackend::localAssistantChat(QJsonObject payload, QString model, QString endpoint)
+{
+    QString chatUrl;
+    QString error;
+    if (!loopbackChatUrl(endpoint, &chatUrl, &error))
+        return jsonCompact(failureObject(error));
+    if (model.trimmed().isEmpty())
+        return jsonCompact(failureObject(QStringLiteral("No local chat model is available.")));
+
+    QNetworkAccessManager network;
+    QNetworkRequest httpRequest{QUrl(chatUrl)};
+    httpRequest.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+    httpRequest.setTransferTimeout(120000);
+
+    const qint64 startedMs = QDateTime::currentMSecsSinceEpoch();
+    QNetworkReply* reply = network.post(httpRequest, QJsonDocument(payload).toJson(QJsonDocument::Compact));
+
+    QEventLoop loop;
+    QTimer guard;
+    guard.setSingleShot(true);
+    QObject::connect(&guard, &QTimer::timeout, &loop, &QEventLoop::quit);
+    QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    guard.start(125000);
+    loop.exec();
+    guard.stop();
+
+    QJsonObject result;
+    result.insert(QStringLiteral("model"), model);
+    result.insert(QStringLiteral("provider"), QStringLiteral("ollama"));
+    result.insert(QStringLiteral("seconds"),
+                  (QDateTime::currentMSecsSinceEpoch() - startedMs) / 1000.0);
+
+    if (!reply->isFinished()) {
+        reply->abort();
+        reply->deleteLater();
+        result.insert(QStringLiteral("success"), false);
+        result.insert(QStringLiteral("error"), QStringLiteral("The local model did not answer within 125 seconds."));
+        return jsonCompact(result);
+    }
+
+    const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    const QByteArray body = reply->readAll();
+    const QString networkError = reply->errorString();
+    const bool transportFailed = reply->error() != QNetworkReply::NoError && status == 0;
+    reply->deleteLater();
+    result.insert(QStringLiteral("httpStatus"), status);
+
+    if (transportFailed) {
+        result.insert(QStringLiteral("success"), false);
+        result.insert(QStringLiteral("error"), QStringLiteral("The local model could not be reached: ") + networkError);
+        return jsonCompact(result);
+    }
+    if (status < 200 || status >= 300) {
+        QString detail = QString::fromUtf8(body).left(300).trimmed();
+        if (detail.isEmpty())
+            detail = networkError;
+        result.insert(QStringLiteral("success"), false);
+        result.insert(QStringLiteral("error"), QStringLiteral("The local model returned HTTP ")
+                          + QString::number(status)
+                          + (detail.isEmpty() ? QString() : QStringLiteral(": ") + detail));
+        return jsonCompact(result);
+    }
+
+    const QJsonObject parsed = QJsonDocument::fromJson(body).object();
+    const QJsonArray choices = parsed.value(QStringLiteral("choices")).toArray();
+    QString content;
+    if (!choices.isEmpty()) {
+        const QJsonValue value = choices.first().toObject()
+                                     .value(QStringLiteral("message")).toObject()
+                                     .value(QStringLiteral("content"));
+        if (value.isString()) {
+            content = value.toString();
+        } else if (value.isArray()) {
+            QStringList parts;
+            for (const QJsonValue& part : value.toArray()) {
+                const QString text = part.toObject().value(QStringLiteral("text")).toString();
+                if (!text.isEmpty())
+                    parts.append(text);
+            }
+            content = parts.join(QLatin1Char(' '));
+        }
+    }
+    if (content.trimmed().isEmpty()) {
+        result.insert(QStringLiteral("success"), false);
+        result.insert(QStringLiteral("error"), QStringLiteral("The local model returned no text."));
+        return jsonCompact(result);
+    }
+
+    const QString servedModel = parsed.value(QStringLiteral("model")).toString().trimmed();
+    if (!servedModel.isEmpty())
+        result.insert(QStringLiteral("model"), servedModel);
+    const QJsonObject usage = parsed.value(QStringLiteral("usage")).toObject();
+    if (!usage.isEmpty())
+        result.insert(QStringLiteral("usage"), usage);
+    result.insert(QStringLiteral("success"), true);
+    result.insert(QStringLiteral("content"), content);
+    return jsonCompact(result);
+}
+
 QString DhunCommonsBackend::aiStatus()
 {
+    const QJsonObject local = localModelInfo();
+    if (local.value(QStringLiteral("success")).toBool()) {
+        QJsonObject result = local;
+        result.insert(QStringLiteral("configured"), true);
+        result.insert(QStringLiteral("source"), QStringLiteral("loopback"));
+        result.insert(QStringLiteral("mode"), QStringLiteral("local-loopback"));
+        result.insert(QStringLiteral("note"), QStringLiteral("Local inference is active. Prompts and context stay on this device; no OpenRouter key is needed."));
+        return jsonCompact(result);
+    }
+
     const AiConfig cfg = aiConfig();
     QJsonObject result;
     result.insert(QStringLiteral("success"), true);
     result.insert(QStringLiteral("configured"), !cfg.key.isEmpty());
     result.insert(QStringLiteral("source"), cfg.source);
     result.insert(QStringLiteral("model"), cfg.model);
+    result.insert(QStringLiteral("provider"), cfg.key.isEmpty() ? QString() : QStringLiteral("openrouter"));
     result.insert(QStringLiteral("endpoint"), QString::fromLatin1(kOpenRouterUrl));
     result.insert(QStringLiteral("configPath"), cfg.configPath);
     result.insert(QStringLiteral("insecureFile"), cfg.insecureFile);
-    result.insert(QStringLiteral("mode"), QStringLiteral("openrouter-remote"));
+    result.insert(QStringLiteral("mode"), cfg.key.isEmpty()
+                      ? QStringLiteral("built-in") : QStringLiteral("openrouter-remote"));
     result.insert(QStringLiteral("note"),
                   cfg.key.isEmpty()
-                      ? QStringLiteral("No OpenRouter key is configured. Set OPENROUTER_API_KEY before "
-                                       "launching Basecamp, or write the key to the config file path "
-                                       "and chmod 600. The key is read at runtime and never stored by "
-                                       "this module.")
-                      : QStringLiteral("Model requests go from the module backend process to "
-                                       "openrouter.ai. Prompts leave this device. The key stays in the "
-                                       "environment or the private config file and is never logged."));
+                      ? QStringLiteral("No local model responded and no OpenRouter key is configured. Built-in guidance remains available; start a loopback model such as Ollama, or configure OpenRouter for remote inference.")
+                      : QStringLiteral("Local inference was not available, so model requests go to openrouter.ai. Prompts leave this device; the key stays in the environment or private config file and is never logged."));
     if (cfg.insecureFile) {
         result.insert(QStringLiteral("warning"),
                       QStringLiteral("The OpenRouter config file is readable or writable by other "
@@ -1271,13 +1417,35 @@ QString DhunCommonsBackend::aiChat(QString requestJson)
     if (messages.isEmpty())
         return jsonCompact(failureObject(QStringLiteral("The assistant request had no usable messages.")));
 
+    double temperature = request.value(QStringLiteral("temperature")).toDouble(0.2);
+    temperature = qBound(0.0, temperature, 2.0);
+    int maxTokens = request.value(QStringLiteral("maxTokens")).toInt(900);
+    maxTokens = qBound(64, maxTokens, 4096);
+
+    const QJsonObject local = localModelInfo();
+    if (local.value(QStringLiteral("success")).toBool()) {
+        const QString localModel = local.value(QStringLiteral("model")).toString();
+        QJsonObject localPayload;
+        localPayload.insert(QStringLiteral("model"), localModel);
+        localPayload.insert(QStringLiteral("messages"), messages);
+        localPayload.insert(QStringLiteral("temperature"), temperature);
+        localPayload.insert(QStringLiteral("max_tokens"), maxTokens);
+        localPayload.insert(QStringLiteral("stream"), false);
+        return localAssistantChat(localPayload, localModel, local.value(QStringLiteral("endpoint")).toString());
+    }
+
+    if (request.value(QStringLiteral("localOnly")).toBool(false)) {
+        QJsonObject result = failureObject(
+            QStringLiteral("The local Ollama model is unavailable. Kitchen did not contact a remote provider; start Ollama and retry, or use the built-in planner."));
+        result.insert(QStringLiteral("provider"), QStringLiteral("ollama"));
+        result.insert(QStringLiteral("configured"), false);
+        return jsonCompact(result);
+    }
+
     const AiConfig cfg = aiConfig();
     if (cfg.key.isEmpty()) {
         QJsonObject result = failureObject(
-            QStringLiteral("No OpenRouter key is configured, so no model was called. Set "
-                           "OPENROUTER_API_KEY before launching Basecamp, or write "
-                           "{ \"apiKey\": \"...\" } to ") + cfg.configPath
-            + QStringLiteral(" and chmod 600."));
+            QStringLiteral("No local model responded and no OpenRouter key is configured. Start a loopback model, or configure OpenRouter for remote inference."));
         result.insert(QStringLiteral("configured"), false);
         result.insert(QStringLiteral("configPath"), cfg.configPath);
         return jsonCompact(result);
@@ -1289,11 +1457,6 @@ QString DhunCommonsBackend::aiChat(QString requestJson)
     static const QRegularExpression modelRe(QStringLiteral("^[A-Za-z0-9._:/-]{2,96}$"));
     if (!modelRe.match(model).hasMatch())
         return jsonCompact(failureObject(QStringLiteral("That model name is not a valid OpenRouter model id.")));
-
-    double temperature = request.value(QStringLiteral("temperature")).toDouble(0.2);
-    temperature = qBound(0.0, temperature, 2.0);
-    int maxTokens = request.value(QStringLiteral("maxTokens")).toInt(900);
-    maxTokens = qBound(64, maxTokens, 4096);
 
     QJsonObject payload;
     payload.insert(QStringLiteral("model"), model);

@@ -25,8 +25,8 @@ Item {
     property string modelEndpoint: "http://127.0.0.1:11434/v1"
     property string modelName: "qwen2.5vl:3b"
     property bool modelBusy: false
-    property string modelStatus: "No model called. The built-in planner reads the typed lines offline."
-    property string modelProvenance: "Built-in planner · offline"
+    property string modelStatus: "Checking local menu suggestions…"
+    property string modelProvenance: "Local AI · checking availability"
     property bool cooledWithin2h: false
     property bool refrigerated: false
     property bool untouched: false
@@ -59,8 +59,8 @@ Item {
         promptInfo = null;
         modelTips = [];
         setMenuText(sample.text);
-        modelProvenance = "Built-in planner · offline";
-        modelStatus = "Sample menu loaded. No model called.";
+        modelProvenance = "Built-in planner · sample menu";
+        modelStatus = "Sample menu loaded. Change guests to recalculate quantities and costs.";
         rebuild();
     }
 
@@ -90,7 +90,10 @@ Item {
             modelStatus = interpreted.error;
             return;
         }
-        if (interpreted.guests > 0) guests = interpreted.guests;
+        if (interpreted.guests > 0) {
+            guests = interpreted.guests;
+            guestsField.text = String(guests);
+        }
         modelTips = [];
         promptInfo = {
             text: promptText,
@@ -102,53 +105,69 @@ Item {
         modelProvenance = "Built-in planner · " +
             (interpreted.kind === "mood" ? "mood match" :
              (interpreted.kind === "dish" ? "dish match" : "seasonal fallback"));
-        modelStatus = interpreted.note + " Sourcing, waste uses and the safety gate are computed locally.";
+        modelStatus = interpreted.note + " Sourcing and costs are calculated from local app data.";
         rebuild();
     }
 
-    function askModelForPrompt() {
+    function fallbackFromPrompt(reason) {
+        planFromPrompt();
+        if (plan && plan.ok)
+            modelStatus = reason + " The built-in local planner made a fallback plan; review its menu and estimates.";
+        else
+            modelStatus = reason + " " + modelStatus;
+    }
+
+    function suggestMenuWithLocalAi() {
         if (modelBusy) return;
         if (!backendReady()) {
-            modelStatus = "The module backend is not ready. Open Dhun Commons inside Basecamp to reach OpenRouter.";
+            fallbackFromPrompt("Basecamp's local AI connection is not ready. No remote provider was used.");
             return;
         }
         var request = String(promptText || "").trim();
-        if (!request.length) request = String(menuText || "").trim();
         if (!request.length) {
-            modelStatus = "Type a dish or mood first.";
+            modelStatus = "Describe the meal, cuisine, preferences or constraints first.";
             return;
         }
-        var dishNames = Kitchen.dishChoices().map(function (item) { return item.name; });
-        var offerNames = Logic.produceOffers(app).slice(0, 20).map(function (offer) {
-            return String(offer.title || offer.ingredientId || offer.id);
+        var interpreted = Kitchen.interpretPrompt(request, month);
+        if (interpreted.ok && interpreted.guests > 0) {
+            guests = interpreted.guests;
+            guestsField.text = String(guests);
+        }
+        var state = app && app.state ? app.state : app;
+        var offers = Logic.produceOffers(state).map(function (offer) {
+            return {
+                ingredientId: String(offer.ingredientId || ""),
+                title: String(offer.title || offer.ingredientId || ""),
+                stock: Number(offer.stock) || 0,
+                unit: String(offer.unit || ""),
+                pricePerUnit: Number(offer.price) || 0,
+                supplier: String(offer.supplier || "")
+            };
         });
         modelBusy = true;
-        modelStatus = "Asking OpenRouter to translate the request into kitchen-library dishes. Sourcing, waste uses and the safety gate stay local.";
+        modelStatus = "Asking the local model for a menu. Guest-scaled quantities, stock coverage and costs will be computed by the planner.";
         var payload = {
-            messages: Assistant.kitchenMessages(request, guests, month, dishNames, offerNames),
+            messages: Assistant.kitchenMessages(request, guests, month, Kitchen.dishChoices(), offers),
             maxTokens: 900,
-            temperature: 0.2
+            temperature: 0.2,
+            localOnly: true
         };
         logos.watch(host.relayBackend.aiChat(JSON.stringify(payload)), function (value) {
             page.modelBusy = false;
             var snapshot = {};
             try { snapshot = JSON.parse(String(value)); } catch (error) { snapshot = {}; }
-            if (!snapshot.success) {
-                page.modelStatus = snapshot.error || "The model request failed. The built-in planner is still available.";
+            if (!snapshot.success || snapshot.provider !== "ollama") {
+                page.fallbackFromPrompt(snapshot.error || "The local model did not return a local response. No remote provider was used.");
                 return;
             }
-            var reply = Kitchen.parseModelReply(snapshot.content || "");
-            if (!reply.ok) {
-                page.modelStatus = reply.error;
-                return;
-            }
-            if (!reply.matched) {
-                page.modelStatus = "The model named dishes that are not in the kitchen library, so the menu was left unchanged. Use Plan it instead, or edit the lines by hand.";
+            var reply = Kitchen.parseModelReply(snapshot.content || "", { allowExtras: false });
+            if (!reply.ok || !reply.matched) {
+                page.fallbackFromPrompt(reply.error || "The local model did not choose a recognized dish.");
                 return;
             }
             var data = Assistant.parseJsonObject(snapshot.content || "");
             var tips = [];
-            if (data && data.wasteTips && data.wasteTips.length) {
+            if (data && Array.isArray(data.wasteTips)) {
                 for (var i = 0; i < data.wasteTips.length && tips.length < 6; ++i) {
                     var tip = String(data.wasteTips[i] || "").trim();
                     if (tip) tips.push(tip);
@@ -156,20 +175,19 @@ Item {
             }
             page.modelTips = tips;
             page.setMenuText(Kitchen.modelReplyToText(reply));
-            if (reply.servings > 0) page.guests = reply.servings;
             page.promptInfo = {
                 text: request,
                 kind: "model",
-                note: "Model-assisted menu · review the lines before filing.",
+                note: "Local AI menu suggestion · review dishes and verify dietary constraints before cooking.",
                 dishes: reply.dishes.map(function (item) { return item.name; })
             };
-            page.modelProvenance = "OpenRouter · " + String(snapshot.model || "model") + " · review";
-            page.modelStatus = "Reply received in " + Math.max(1, Math.round(Number(snapshot.seconds) || 0)) +
-                " s. Farm sourcing, prices, waste uses and the safety gate are computed by the built-in planner.";
+            page.modelProvenance = "Local AI · review";
+            page.modelStatus = "Local suggestion received in " + Math.max(1, Math.round(Number(snapshot.seconds) || 0)) +
+                " s. Quantities and all itemized estimates were recalculated for " + page.guests + " guests.";
             page.rebuild();
         }, function (error) {
             page.modelBusy = false;
-            page.modelStatus = "The module backend could not reach OpenRouter: " + error;
+            page.fallbackFromPrompt("Local AI could not be reached: " + error + ". No remote provider was used.");
         });
     }
 
@@ -199,32 +217,23 @@ Item {
     }
 
     function checkServer() {
-        if (!Kitchen.localEndpointAllowed(modelEndpoint)) {
-            modelStatus = "Only a loopback endpoint is allowed. Use http://127.0.0.1:11434/v1 or another local port.";
-            return;
-        }
         if (!backendReady()) {
-            modelStatus = "The module backend is not ready. Open Dhun Commons inside Basecamp to reach a local model.";
+            modelStatus = "Connecting to the local AI backend. The built-in planner is available; Kitchen will not call a remote provider.";
+            modelProvenance = "Local AI · connecting";
             return;
         }
-        modelBusy = true;
-        modelStatus = "Checking " + Kitchen.modelsUrl(modelEndpoint) + " …";
         logos.watch(host.relayBackend.probeModelServer(modelEndpoint), function (value) {
-            page.modelBusy = false;
             var reply = {};
             try { reply = JSON.parse(String(value)); } catch (error) { reply = {}; }
-            if (!reply.success) {
-                page.modelStatus = reply.error || "No local model server replied. Start Ollama or llama.cpp on loopback.";
-                return;
-            }
-            var names = reply.models || [];
-            var label = String(reply.url || page.modelEndpoint);
-            page.modelStatus = names.length
-                ? "Local server reachable at " + label + " · " + names.join(" · ")
-                : "Local server reachable at " + label + ", but it listed no models.";
-        }, function (error) {
-            page.modelBusy = false;
-            page.modelStatus = "The module backend could not check the model server: " + error;
+            page.modelStatus = reply.success && reply.models && reply.models.length
+                ? "Local AI is ready. Menu suggestions stay on this Mac."
+                : "Local AI is unavailable. Kitchen will use its built-in planner and will not call a remote provider.";
+            page.modelProvenance = reply.success && reply.models && reply.models.length
+                ? "Local AI · ready"
+                : "Built-in planner · available";
+        }, function () {
+            page.modelStatus = "Local AI is unavailable. Kitchen will not call a remote provider; the built-in planner still works.";
+            page.modelProvenance = "Built-in planner · available";
         });
     }
 
@@ -234,17 +243,13 @@ Item {
             modelStatus = "Only a loopback endpoint is allowed. The photo is not sent to a remote host.";
             return;
         }
-        if (!modelName.trim().length) {
-            modelStatus = "Name the local vision model first (for example qwen2.5vl:3b).";
-            return;
-        }
         if (!backendReady()) {
             modelStatus = "The module backend is not ready. Open Dhun Commons inside Basecamp to read a local photo.";
             return;
         }
         var path = localPath(photoUrl);
         modelBusy = true;
-        modelStatus = "Reading the photo and asking " + modelName + " on loopback. Local inference can take a while …";
+        modelStatus = "Reading the photo with local AI. The image stays on this Mac.";
         logos.watch(host.relayBackend.startMenuPhoto(path, modelEndpoint, modelName, Kitchen.MODEL_PROMPT), function (value) {
             page.modelBusy = false;
             var snapshot = {};
@@ -267,10 +272,10 @@ Item {
             page.modelTips = [];
             page.promptInfo = {
                 kind: "photo",
-                note: "Dish names read from the menu photo by " + page.modelName + " on loopback.",
+                note: "Dish names read from the menu photo locally; review before using.",
                 dishes: reply.dishes.map(function (item) { return item.name; })
             };
-            page.modelProvenance = "Extracted by " + page.modelName + " on loopback · review the lines and the safety gate.";
+            page.modelProvenance = "Local photo read · review";
             page.modelStatus = "Reply received in " + Math.max(1, Math.round(Number(snapshot.seconds) || 0)) + " s." +
                 (reply.notes.length ? " " + reply.notes.join(" · ") : "");
             page.rebuild();
@@ -280,9 +285,18 @@ Item {
         });
     }
 
+    Connections {
+        target: page.host
+        ignoreUnknownSignals: true
+        function onRelayBackendChanged() {
+            if (page.backendReady()) page.checkServer();
+        }
+    }
+
     Component.onCompleted: {
         menuArea.text = menuText;
         rebuild();
+        checkServer();
     }
 
     Flickable {
@@ -428,41 +442,14 @@ Item {
                         color: Theme.lineSoft
                     }
 
-                    Eyebrow { text: "LOCAL VISION MODEL" }
-
-                    LabeledField {
-                        Layout.fillWidth: true
-                        label: "Loopback endpoint"
-                        text: page.modelEndpoint
-                        maximumLength: 200
-                        onTextChanged: if (page.modelEndpoint !== text) page.modelEndpoint = text
-                        hint: "Only 127.0.0.1 / localhost are accepted. Remote endpoints are refused."
-                    }
-
-                    LabeledField {
-                        Layout.fillWidth: true
-                        label: "Model name"
-                        text: page.modelName
-                        maximumLength: 80
-                        onTextChanged: if (page.modelName !== text) page.modelName = text
-                        hint: "qwen2.5vl:3b is the tested default; qwen2.5vl:7b reads dense menus better but needs more memory."
-                    }
+                    Eyebrow { text: "OPTIONAL LOCAL PHOTO READ" }
 
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 6
 
                         ActionButton {
-                            text: page.modelBusy ? "Working…" : "Check server"
-                            variant: "secondary"
-                            compact: true
-                            fontSize: 9
-                            enabled: !page.modelBusy
-                            onClicked: page.checkServer()
-                        }
-
-                        ActionButton {
-                            text: page.modelBusy ? "Working…" : "Read photo"
+                            text: page.modelBusy ? "Working…" : "Read photo locally"
                             compact: true
                             fontSize: 9
                             enabled: !page.modelBusy
@@ -484,7 +471,7 @@ Item {
 
                     Text {
                         Layout.fillWidth: true
-                        text: "Free local vision options: Qwen2.5-VL-7B-Instruct (Apache-2.0), LLaVA-OneVision-7B (Apache-2.0), moondream2 (Apache-2.0), Florence-2-large (MIT). See docs/KITCHEN.md. None is bundled or claimed to be running."
+                        text: "Typed menu suggestions and photo reading use local Ollama only. No OpenRouter key or cloud provider is used by Kitchen."
                         color: Theme.mutedLight
                         font.family: Theme.uiFont
                         font.pixelSize: 7
@@ -499,7 +486,7 @@ Item {
                     padding: 18
                     gap: 9
 
-                    Eyebrow { text: "DISH, MOOD OR ANYTHING" }
+                    Eyebrow { text: "WHAT DO YOU WANT TO COOK?" }
 
                     Rectangle {
                         Layout.fillWidth: true
@@ -514,7 +501,7 @@ Item {
                             anchors.fill: parent
                             anchors.margins: 9
                             padding: 0
-                            placeholderText: "e.g. I feel cold and tired. Lunch for 20 people, nothing wasted."
+                            placeholderText: "e.g. A warming vegetarian lunch for 20; no peanuts. Prefer produce already listed locally."
                             placeholderTextColor: Theme.mutedLight
                             color: Theme.ink
                             font.family: Theme.uiFont
@@ -534,22 +521,23 @@ Item {
                             compact: true
                             variant: "lime"
                             fontSize: 9
-                            text: "Plan it"
-                            onClicked: page.planFromPrompt()
+                            text: page.modelBusy ? "Suggesting…" : "Suggest menu locally"
+                            enabled: !page.modelBusy
+                            onClicked: page.suggestMenuWithLocalAi()
                         }
 
                         ActionButton {
                             compact: true
                             variant: "secondary"
                             fontSize: 9
-                            text: page.modelBusy ? "Asking…" : "Ask OpenRouter"
+                            text: "Use built-in planner"
                             enabled: !page.modelBusy
-                            onClicked: page.askModelForPrompt()
+                            onClicked: page.planFromPrompt()
                         }
 
                         Text {
                             Layout.fillWidth: true
-                            text: "Plan it reads the text offline. Ask OpenRouter needs a runtime key and sends only this request."
+                            text: "Local AI suggests dishes from Dhun's built-in menu library; the planner calculates quantities, local sourcing and estimates. Add dietary needs here and verify ingredients before cooking. Unsupported cuisines need recipes added to the library first."
                             color: Theme.mutedLight
                             font.family: Theme.uiFont
                             font.pixelSize: 7
@@ -592,7 +580,7 @@ Item {
                             anchors.fill: parent
                             anchors.margins: 10
                             padding: 0
-                            placeholderText: "One dish per line, for example:\nBajra Roti\nMoth Dal\nSarson Saag"
+                            placeholderText: "Suggested menu appears here. You can edit it; use one dish per line."
                             color: Theme.ink
                             font.family: Theme.uiFont
                             font.pixelSize: 11
@@ -775,7 +763,7 @@ Item {
                         Item { Layout.fillWidth: true }
 
                         ActionButton {
-                            text: "Plan the menu"
+                            text: "Recalculate sourcing"
                             compact: true
                             fontSize: 9
                             onClicked: page.rebuild()
@@ -784,7 +772,7 @@ Item {
 
                     Text {
                         Layout.fillWidth: true
-                        text: page.modelProvenance + ". Quantities, stock and prices are planning estimates from the seeded Market; they are not live farmer inventory."
+                        text: page.modelProvenance + ". Quantities scale with guests. Listed Market lots are rehearsal data; unlisted needs and lot shortfalls are estimates to confirm locally, not live inventory."
                         color: Theme.muted
                         font.family: Theme.uiFont
                         font.pixelSize: 8
@@ -856,9 +844,9 @@ Item {
 
                 StatTile {
                     Layout.fillWidth: true
-                    label: "ESTIMATED COST"
+                    label: "ESTIMATED TOTAL"
                     value: page.plan ? page.plan.totals.costInr : "₹0"
-                    caption: page.plan ? page.plan.totals.marketCostInr + " Market · " + page.plan.totals.plotCostInr + " plot estimate" : ""
+                    caption: page.plan ? page.plan.totals.perPersonCostInr + "/person · " + page.plan.totals.marketCostInr + " listed · " + page.plan.totals.plotCostInr + " est." : ""
                     accent: Theme.clay
                 }
 
@@ -1037,7 +1025,7 @@ Item {
 
                 Text {
                     Layout.fillWidth: true
-                    text: "Each line is tied to the ingredient's plot on the field map. A Market lot uses the seeded offer stock; a field-plot line is an estimate to confirm with the grower, not a live inventory promise."
+                    text: "Each item shows local listed stock and the farm-map source. Listed lots are seeded rehearsal data; quantities beyond a lot and unlisted ingredients use a clearly marked estimate to confirm with the grower before sourcing."
                     color: Theme.muted
                     font.family: Theme.uiFont
                     font.pixelSize: 8
@@ -1190,7 +1178,9 @@ Item {
 
                                         Text {
                                             Layout.alignment: Qt.AlignRight
-                                            text: (modelData.estimated ? "est. " : "") + Logic.formatINR(modelData.cost)
+                                            text: modelData.marketCost > 0 && modelData.estimatedCost > 0
+                                                  ? Logic.formatINR(modelData.marketCost) + " lot + " + Logic.formatINR(modelData.estimatedCost) + " est."
+                                                  : (modelData.estimated ? "est. " : "") + Logic.formatINR(modelData.cost)
                                             color: Theme.inkSoft
                                             font.family: Theme.uiFont
                                             font.pixelSize: 8

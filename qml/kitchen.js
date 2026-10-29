@@ -699,7 +699,14 @@ function dishById(id) {
 function dishChoices() {
     var result = [];
     for (var i = 0; i < dishLibrary.length; ++i) {
-        result.push({ id: dishLibrary[i].id, name: dishLibrary[i].name, kind: dishLibrary[i].kind });
+        var dish = dishLibrary[i];
+        var ingredients = [];
+        var ids = Object.keys(dish.perHead || {});
+        for (var j = 0; j < ids.length; ++j) {
+            var ingredient = Data.ingredientById(ids[j]);
+            if (ingredient) ingredients.push({ name: ingredient.name, gramsPerGuest: dish.perHead[ids[j]] });
+        }
+        result.push({ id: dish.id, name: dish.name, kind: dish.kind, ingredients: ingredients });
     }
     return result;
 }
@@ -839,6 +846,10 @@ function buildSourcingLine(state, requirement, month) {
     var stock = offer ? Number(offer.stock) || 0 : 0;
     var coverageUnits = Math.min(needUnits, stock);
     var shortfall = Math.max(0, needUnits - stock);
+    var listedCost = offer ? offerCost(offer, coverageUnits) : 0;
+    var estimateUnits = offer ? shortfall : needUnits;
+    var estimatePrice = Number(ingredient.price) || (offer ? Number(offer.price) || 0 : 0);
+    var estimatedCost = estimateUnits * estimatePrice;
     var inSeason = Data.isInSeason(ingredient, month);
     var plot = Data.plotFor(ingredient);
     var grower = Data.growerFor(ingredient);
@@ -866,8 +877,10 @@ function buildSourcingLine(state, requirement, month) {
         shortfall: shortfall,
         shortfallLabel: shortfall > 0 ? qty(shortfall) + " " + unit : "",
         price: offer ? Number(offer.price) || 0 : Number(ingredient.price) || 0,
-        cost: offer ? offerCost(offer, needUnits) : needUnits * (Number(ingredient.price) || 0),
-        estimated: !offer,
+        cost: listedCost + estimatedCost,
+        marketCost: listedCost,
+        estimatedCost: estimatedCost,
+        estimated: estimatedCost > 0,
         offerId: offer ? offer.id : "",
         supplier: offer ? offer.supplier : grower.name,
         growerId: offer ? offer.growerId : grower.id,
@@ -1106,7 +1119,7 @@ function emptyPlan(reason) {
         natives: [],
         preserves: [],
         memorabilia: null,
-        totals: { cost: 0, costInr: 0, coverage: 0, lines: 0, covered: 0, shortfall: 0, requiredKg: 0, coveredKg: 0 },
+        totals: { cost: 0, costInr: 0, perPersonCost: 0, perPersonCostInr: 0, coverage: 0, lines: 0, covered: 0, shortfall: 0, requiredKg: 0, coveredKg: 0 },
         notes: []
     };
 }
@@ -1135,8 +1148,8 @@ function buildPlan(state, options) {
     var coveredKg = 0;
     for (var k = 0; k < lines.length; ++k) {
         cost += lines[k].cost;
-        if (lines[k].estimated) plotCost += lines[k].cost;
-        else marketCost += lines[k].cost;
+        marketCost += Number(lines[k].marketCost) || 0;
+        plotCost += Number(lines[k].estimatedCost) || 0;
         requiredKg += lines[k].need * unitWeight(lines[k].unit) / 1000;
         coveredKg += Math.min(lines[k].need, lines[k].stock) * unitWeight(lines[k].unit) / 1000;
         if (lines[k].status === "covered") covered += 1;
@@ -1170,6 +1183,8 @@ function buildPlan(state, options) {
         totals: {
             cost: cost,
             costInr: Logic.formatINR(cost),
+            perPersonCost: guests > 0 ? cost / guests : 0,
+            perPersonCostInr: Logic.formatINR(Math.round(guests > 0 ? cost / guests : 0)),
             marketCost: marketCost,
             marketCostInr: Logic.formatINR(marketCost),
             plotCost: plotCost,
@@ -1191,7 +1206,7 @@ function buildPlan(state, options) {
     return plan;
 }
 
-function parseModelReply(content) {
+function parseModelReply(content, options) {
     var text = String(content === undefined || content === null ? "" : content).trim();
     if (!text) return { ok: false, error: "The model returned an empty reply.", dishes: [], extras: [], notes: [] };
     text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
@@ -1224,11 +1239,13 @@ function parseModelReply(content) {
             continue;
         }
         var found = false;
-        for (var k = 0; k < Data.ingredients.length; ++k) {
-            if (normalize(name).indexOf(normalize(Data.ingredients[k].name)) !== -1) {
-                extras.push({ id: Data.ingredients[k].id, name: Data.ingredients[k].name, gramsPerHead: 100 });
-                found = true;
-                break;
+        if (!options || options.allowExtras !== false) {
+            for (var k = 0; k < Data.ingredients.length; ++k) {
+                if (normalize(name).indexOf(normalize(Data.ingredients[k].name)) !== -1) {
+                    extras.push({ id: Data.ingredients[k].id, name: Data.ingredients[k].name, gramsPerHead: 100 });
+                    found = true;
+                    break;
+                }
             }
         }
         if (!found) unmatched.push(String(name));

@@ -29,7 +29,8 @@ SideSheet {
     subtitle: "Ask about earning DHN, planning a low-waste meal or matching your background to a programme. Amounts and balances come from this device's rehearsal state; a payout still needs two of three signatures."
 
     readonly property bool configured: status && status.configured === true
-    readonly property string modelLabel: status && status.model ? String(status.model) : "openai/gpt-4o"
+    readonly property string modelLabel: status && status.model ? String(status.model) : "local model"
+    readonly property string providerLabel: status && status.provider === "ollama" ? "Local Ollama" : "OpenRouter"
 
     onOpenChanged: {
         if (!open) return;
@@ -38,7 +39,7 @@ SideSheet {
         chatModel.clear();
         chatModel.append({
             text: "Ask about today's DHN actions, a dish or mood for the kitchen, or your background. " +
-                  "Built-in guidance works without a key; model answers need OpenRouter configured.",
+                  "Dhun prefers a local Ollama model; OpenRouter is an optional remote fallback.",
             mine: false,
             source: "built-in",
             meta: "Local guidance · no model called"
@@ -102,15 +103,17 @@ SideSheet {
                 return;
             }
             var seconds = Math.max(0.1, Number(snapshot.seconds) || 0);
-            drawer.appendMessage(snapshot.content, false, "openrouter",
-                "OpenRouter · " + String(snapshot.model || drawer.modelLabel) +
+            var provider = String(snapshot.provider || drawer.status.provider || "openrouter");
+            var providerName = provider === "ollama" ? "Local Ollama" : "OpenRouter";
+            drawer.appendMessage(snapshot.content, false, provider,
+                providerName + " · " + String(snapshot.model || drawer.modelLabel) +
                 " · " + seconds.toFixed(1) + " s");
             drawer.history = drawer.history.concat([
-                { mine: false, text: snapshot.content, source: "openrouter" }
+                { mine: false, text: snapshot.content, source: provider }
             ]);
         }, function (error) {
             drawer.busy = false;
-            drawer.appendMessage("The module backend could not reach OpenRouter: " + error +
+            drawer.appendMessage("The assistant backend could not complete the model request: " + error +
                                  "\n\n" + Assistant.localAnswer(app, text), false, "built-in",
                                  "Model unavailable · built-in guidance shown");
         });
@@ -154,8 +157,8 @@ SideSheet {
                 Text {
                     Layout.fillWidth: true
                     text: drawer.configured
-                          ? "OpenRouter · " + drawer.modelLabel
-                          : (drawer.statusChecked ? "No OpenRouter key configured" : "Checking the assistant backend…")
+                          ? drawer.providerLabel + " · " + drawer.modelLabel
+                          : (drawer.statusChecked ? "No local model or OpenRouter key" : "Checking the assistant backend…")
                     color: Theme.ink
                     font.family: Theme.uiFont
                     font.pixelSize: 10
@@ -166,8 +169,10 @@ SideSheet {
                 Text {
                     Layout.fillWidth: true
                     text: drawer.configured
-                          ? "Remote inference · prompts leave this device · key read at runtime"
-                          : "Built-in guidance still works. Set OPENROUTER_API_KEY or a private config file to call a model."
+                          ? (drawer.status.provider === "ollama"
+                             ? "Local inference · prompts stay on this device"
+                             : "Remote inference · prompts leave this device · key read at runtime")
+                          : "Built-in guidance still works. Start local Ollama or configure OpenRouter for remote answers."
                     color: Theme.muted
                     font.family: Theme.uiFont
                     font.pixelSize: 8
@@ -403,7 +408,9 @@ SideSheet {
 
         Text {
             Layout.fillWidth: true
-            text: "Ctrl+Enter sends. With a key, the conversation and the context JSON go to openrouter.ai."
+            text: drawer.status.provider === "ollama"
+                  ? "Ctrl+Enter sends. Local inference keeps this conversation on your Mac."
+                  : "Ctrl+Enter sends. OpenRouter sends the conversation and context JSON off-device."
             color: Theme.mutedLight
             font.family: Theme.uiFont
             font.pixelSize: 7

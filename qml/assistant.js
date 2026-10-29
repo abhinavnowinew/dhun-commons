@@ -17,15 +17,16 @@ var SYSTEM_PROMPT =
     "plants."
 
 var KITCHEN_PROMPT =
-    "You are planning a farm kitchen menu for Dhun Commons. From the user's dish, mood or free text, " +
-    "choose dishes ONLY from the allowed dish list, and optionally whole ingredients from the " +
-    "available farm offers. Reply with a single JSON object and nothing else: " +
-    "{\"dishes\":[\"exact dish name\"],\"extras\":[\"ingredient name\"],\"servings\":number," +
-    "\"wasteTips\":[\"short practical zero-waste step\"],\"notes\":[\"short caution\"]}. " +
-    "Use 2-5 dishes that fit the mood, season and guest count. Waste tips must reuse stalks, leaves, " +
-    "roots, whey, soaking water or trim safely, or route them to compost or livestock. Include a " +
-    "food-safety caution when a tip involves cooked food, dairy or leftovers. Do not invent prices, " +
-    "stock or shelf lives. Do not give medical or nutrition claims."
+    "You are Dhun Commons' local menu suggestion assistant. Choose 2-5 dishes ONLY from the supplied " +
+    "allowed library, considering the user's cuisine, mood, season, guest count and preferences. Prefer " +
+    "dishes whose listed ingredients have a local Market lot, but do not claim a lot is live or guarantee " +
+    "availability. Return one JSON object only: {\"dishes\":[\"exact allowed dish name\"]," +
+    "\"wasteTips\":[\"short practical zero-waste step\"],\"notes\":[\"short caution or limitation\"]}. " +
+    "Do not output servings, quantities, prices, stock claims, recipes or shelf lives: the built-in planner " +
+    "calculates guest-scaled quantities, listed-lot coverage and estimated costs from local app data. " +
+    "Treat allergies and dislikes as constraints, but never claim a dish is allergen-free; note that the cook " +
+    "must verify ingredients. Waste tips must reuse edible clean trim safely or route it to compost. " +
+    "Give no medical or nutrition claims."
 
 var PROFILE_PROMPT =
     "You assess a steward's background for Dhun Commons project allocation. Be conservative and " +
@@ -250,11 +251,11 @@ function localAnswer(app, prompt) {
         return "Open Kitchen and type the dish or how you feel in the new prompt line. The built-in planner " +
             "maps it to dishes in the kitchen library, then shows the farm lines, waste uses and the pantry " +
             "gate. Filing a built plan queues " + Rewards.amountFor("kitchen-plan") + " DHN once today. " +
-            "The OpenRouter model is not configured, so no model was called.";
+            "No model provider is available, so no AI model was called.";
     }
     if (/profile|cv|background|skill|project|allocate|capab/.test(text)) {
         return "Open your profile from the sidebar. Paste a background or load a .txt/.md file, then run " +
-            "the capability check. Without an OpenRouter key the check cannot call a model; you can still " +
+            "the capability check. Without a configured model provider the check cannot call a model; you can still " +
             "read the local project list and start an allocation proposal by hand. Allocations are " +
             "suggestions, and release still needs two of three signatures.";
     }
@@ -262,21 +263,23 @@ function localAnswer(app, prompt) {
         return "The built-in guidance uses the same reward rules as the app. Nothing here is paid until a " +
             "treasury proposal is executed.\n\n" + ideasText(ideas);
     }
-    return "No OpenRouter key is configured, so no model was called. Here are today's grounded actions:\n\n" +
-        ideasText(ideas) + "\n\nTo enable model answers, set OPENROUTER_API_KEY before launching Basecamp " +
-        "or write the key to ~/.config/dhun-commons/openrouter.json and chmod 600.";
+    return "No local model is running, so no model was called. Here are today's grounded actions:\n\n" +
+        ideasText(ideas) + "\n\nStart Ollama on loopback for local answers, or configure OpenRouter for remote inference.";
 }
 
-function kitchenMessages(freeText, guests, month, dishNames, offerNames) {
+function kitchenMessages(freeText, guests, month, dishOptions, offerOptions) {
     return [
         { role: "system", content: KITCHEN_PROMPT },
         {
             role: "user",
-            content: "Request: " + String(freeText || "").substring(0, 2000) +
-                "\nGuests: " + Number(guests || 0) +
-                "\nMonth: " + Number(month || 0) +
-                "\nAllowed dishes: " + (dishNames || []).join(", ") +
-                "\nAvailable farm offers: " + (offerNames || []).join(", ")
+            content: JSON.stringify({
+                request: String(freeText || "").substring(0, 2000),
+                guests: Number(guests || 0),
+                month: Number(month || 0),
+                allowedDishes: dishOptions || [],
+                listedProduceLots: offerOptions || [],
+                planningRules: "Use these local rehearsal lots only to prefer suitable dishes. The app will calculate all required amounts, source coverage, and costs; do not infer pantry stock."
+            })
         }
     ];
 }

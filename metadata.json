@@ -1,11 +1,11 @@
 {
   "name": "dhun_commons",
   "display_name": "Dhun Commons",
-  "version": "0.4.4",
+  "version": "0.4.6",
   "type": "ui_qml",
   "interface": "universal",
   "category": "community",
-  "description": "A three-party seasonal treasury and field kitchen for Dhun's landscape: private multisig proposals, DHN rewards for node uptime and field work, steward profiles with background and capability review, a whole-wallet assistant that suggests reward-earning work, free-text dish or mood planning with zero-waste steps, external placement, farm sourcing and a guarded long-life pantry, with live LEZ testnet accounts. OpenRouter chat runs only when a key is supplied at runtime.",
+  "description": "A three-party seasonal treasury and field kitchen for Dhun's landscape: private multisig proposals, DHN rewards for node uptime and field work, steward profiles with background and capability review, a whole-wallet assistant that suggests reward-earning work, local-only Ollama menu suggestions with guest-scaled sourcing and cost estimates, zero-waste steps, farm sourcing and a guarded long-life pantry, with live LEZ testnet accounts. Kitchen inference never falls back to a remote provider.",
   "author": "Dhun Commons",
   "main": "dhun_commons_plugin",
   "view": "qml/Main.qml",

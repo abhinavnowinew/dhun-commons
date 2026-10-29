@@ -58,6 +58,8 @@ private:
         bool insecureFile = false;
     };
     AiConfig aiConfig() const;
+    QJsonObject localModelInfo();
+    QString localAssistantChat(QJsonObject payload, QString model, QString endpoint);
 
     bool m_contextReady = false;
     bool m_walletOpen = false;

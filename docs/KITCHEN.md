@@ -10,27 +10,23 @@ The Kitchen tab turns a menu for a number of guests into four things:
 4. a **guarded pantry** of preserves with a shelf life over 20 days, plus a
    guest memorabilia label for a checked batch.
 
-The planner is deterministic and offline. No model is required, and no photo
-leaves the machine. A local vision model can be used as an optional shortcut
-for reading a menu photo; it only transcribes dish names and the guest count.
-A typed dish, mood or occasion is matched against the built-in dish library and
-seasonal routes before any model is involved. Quantities, prices, sourcing,
-zero-waste steps and safety rules always come from the built-in planner in
-[`qml/kitchen.js`](../qml/kitchen.js).
-
-An optional OpenRouter chat call can suggest dishes or waste tips when a key is
-configured at runtime (see [Assistant and OpenRouter](../README.md#assistant-and-openrouter)).
-It is additive: the local zero-waste list, pantry gate and safety blockers still
-come from the deterministic planner.
+The built-in planner remains deterministic and authoritative for quantities,
+local sourcing, costs, waste uses and food-safety rules. When Ollama is running
+on loopback, **Suggest menu locally** asks it to choose dishes from the built-in
+library; the Kitchen call is local-only and cannot fall back to OpenRouter. If
+Ollama is unavailable, the offline planner remains available. Photo reading is
+also optional and uses a loopback model.
 
 ## Using the tab
 
 1. Open **Kitchen** in the sidebar.
-2. Choose a photo, keep the illustrative sample, or type the menu lines.
-3. Set the guest count and the planning month, then press **Plan the menu**.
-4. Read the sourcing list by zone. A *Market lot* line has seeded stock; a
-   *field plot* line has no Market listing and is an estimate to confirm with
-   the grower, not a live inventory promise.
+2. Type the cuisine, occasion, guest preferences and any allergies; set the
+   guest count and planning month. You can also choose a photo to transcribe.
+3. Press **Suggest menu locally** to ask Ollama for library dishes, or use the
+   built-in planner. Review/edit the menu, then press **Recalculate sourcing**.
+4. Read the total and per-person estimate, then the sourcing list by zone. A
+   *Market lot* is seeded rehearsal stock; unlisted needs and lot shortfalls are
+   estimates to confirm with the grower, not live inventory.
 5. Read **Waste parts → kitchen use** and **Native additions**.
 6. Tick the four assurance boxes in **Safety gate for excess food**. Cooked
    leftovers stay blocked until every box is true. Without the gate, only raw,
@@ -56,38 +52,31 @@ sample menus in `qml/kitchen.js` are:
 | Kharif thali | 18 | September |
 | Zaid thali | 30 | May |
 
-## Free text: dish, mood or occasion
+## Menu suggestions and planning
 
-The **Dish, mood or anything** card takes a plain sentence such as
-*"I feel cold and tired. Lunch for 20 people, nothing wasted."* Pressing
-**Plan it** runs the built-in matcher:
+The prompt accepts requests such as *"A warming vegetarian lunch for 20;
+prefer produce already listed locally."* Add food preferences or allergies in
+the prompt and verify ingredients before cooking. A number of guests in the
+prompt updates the guest field; otherwise the chosen guest count is kept.
 
-1. a direct dish or menu name wins first;
-2. otherwise a mood word routes the plan: cold, tired, hot, light, festive,
-   fresh;
-3. otherwise it falls back to the dishes of the current season (rabi, kharif,
-   zaid);
-4. a guest number in the text updates the guest count.
+The local model receives only the request, guest count, planning month, allowed
+dishes with their ingredient lists, and the app's seeded produce lots. It returns
+candidate dish names and optional short waste tips. The app accepts only dish
+names from its library; it ignores model-supplied prices, quantities and stock.
+The built-in planner then scales the ingredient amounts and computes itemized
+sourcing estimates. If local inference is unavailable, Kitchen does not contact
+a remote provider and offers the deterministic built-in planner instead.
 
-The result is labelled with its provenance (*mood match*, *dish match* or
-*seasonal fallback*). The plan then shows the sourcing list and a **Cook
-without waste** card derived from the actual lines: vegetable stems and leaves,
-dal soaking water, the last roti, whey, citrus peel and trim routing, each with
-a caution. The card also explains how to close the loop back to compost.
-
-**Ask OpenRouter** is a separate button. It sends the prompt plus the allowed
-dish ids and current farm offers to the model, asks for strict JSON
-(`dishes`, `extras`, `servings`, `wasteTips`, `notes`), and only accepts dish
-ids from the local library. Model tips are shown under **MODEL TIPS** with the
-model name and a note that the local waste list, pantry gate and safety
-blockers were not replaced. If no key is configured or the call fails, the
-deterministic plan stays on screen and the tab says so.
+The **Built-in planner** uses direct dish names, mood routes (cold, tired, hot,
+light, festive, fresh), and seasonal fallback menus. It remains available even
+when Ollama is offline. The **Cook without waste** card, field-map sourcing,
+market coverage and pantry safety gate always come from local app logic.
 
 ## Optional local vision model
 
 ### What it does
 
-Pressing **Read photo**:
+Pressing **Read photo locally**:
 
 1. asks the module backend (`startMenuPhoto`) to read the local image — PNG,
    JPEG or WebP, ≤ 8 MiB; HEIC is refused with an error;
@@ -104,9 +93,9 @@ Pressing **Read photo**:
 The result comes back through the slot's return value on purpose. With a
 `.rep` PROP, the replica in the UI process kept reading its cached value, so an
 earlier asynchronous build posted the request successfully but the tab never
-saw the stored reply. A slot invoked through `logos.watch` is the supported
-path for a value that crosses the module boundary, and the same pattern already
-backs **Check server**.
+saw the stored reply. A slot invoked through `logos.watch` is the supported path for a value that
+crosses the module boundary; the page also uses this pattern for its quiet
+startup check of the local model server.
 
 The request lives in the backend on purpose. Basecamp sandboxes plugin QML
 network access with a deny-all access-manager factory
@@ -117,10 +106,10 @@ can still reach a loopback server. A side effect is that remote endpoints are
 refused in two places: the tab checks the endpoint before calling the slot, and
 `loopbackChatUrl` re-validates it in C++.
 
-The endpoint must be `127.0.0.1`, `localhost` or `[::1]`. The default is
-`http://127.0.0.1:11434/v1` with model `qwen2.5vl:3b`, the build this machine has
-installed and the one tested below; the model field is editable, and
-`qwen2.5vl:7b` reads denser menus more reliably if you have the memory for it.
+The photo reader uses a loopback endpoint (`127.0.0.1`, `localhost` or
+`[::1]`) and the local model default bundled into the page code. The everyday
+Kitchen workflow hides endpoint and model settings; there is no cloud photo
+upload. Typed menu suggestions use the chat model Ollama advertises locally.
 
 ### Free models verified for this task
 
@@ -218,16 +207,16 @@ plugin QML networking; the probe and the chat request both reach the model now.
 ### Ollama
 
 ```sh
-ollama pull qwen2.5vl:7b   # or qwen2.5vl:3b, the tag tested above (3.2 GB)
 ollama serve               # listens on 127.0.0.1:11434 by default
+ollama pull qwen2.5vl:3b   # optional; this machine already has it installed
 ```
 
-Keep the default loopback bind. In the Kitchen tab use
-`http://127.0.0.1:11434/v1` and the tag you pulled — `qwen2.5vl:3b` is the
-default in the form and what the 2026-10-27 run used; switch to `qwen2.5vl:7b`
-when you have the memory — then **Check server**. Recent Ollama builds accept
-`image_url` data URIs on the OpenAI-compatible endpoint. If a build does not,
-use llama.cpp below.
+Keep Ollama bound to loopback. Kitchen checks availability when it opens and
+uses the model Ollama advertises (or `DHUN_LOCAL_MODEL` if configured in the
+launch environment). The normal page has no endpoint or model fields. If the
+local model is unavailable, typed suggestions do not fall back to cloud
+inference. The optional photo reader also uses loopback; recent Ollama builds
+accept `image_url` data URIs on its OpenAI-compatible endpoint.
 
 ### llama.cpp
 
@@ -238,8 +227,11 @@ llama-server \
   --host 127.0.0.1 --port 8080
 ```
 
-Use `http://127.0.0.1:8080/v1` in the Kitchen tab. The model field is passed
-through; llama-server accepts the served model name.
+For text chat, a loopback server that exposes the OpenAI-compatible `/v1/models`
+and `/v1/chat/completions` endpoints can be selected through
+`DHUN_LOCAL_MODEL_ENDPOINT` and `DHUN_LOCAL_MODEL` in the app's launch
+environment. Kitchen still enforces local-only requests. The photo reader uses
+the page's built-in Ollama loopback defaults.
 
 ### Hardware
 
@@ -277,25 +269,25 @@ The pantry is deliberately conservative.
 
 - Market stock, prices and grower names come from the seeded rehearsal state.
   They are not live farmer inventory.
-- Field-plot costs are estimates based on the seed ingredient price.
-- Photos are read on the local machine. The built-in planner never calls a
-  model; only **Read photo** does, and only against a loopback endpoint.
-- **Ask OpenRouter** calls `https://openrouter.ai/api/v1/chat/completions`
-  only when a key is supplied at runtime. It is model-assisted advice, not the
-  planner, and it never changes sourcing prices, the safety gate or shelf-life
-  rules.
-- Model output is treated as a transcript, not as advice. The model supplies
-  dish names and, when it can, the guest count; every quantity, price, waste
-  use, native pick and shelf life comes from `qml/kitchen.js`.
-- A model can be confidently wrong, including about its own output. In the
-  2026-10-27 run it read all six dishes correctly and still reported
-  `unreadable` in its notes, so the tab names the model that extracted the lines
-  and shows its notes, and the cook is asked to review the lines.
+- Field-plot costs and the cost of any shortfall beyond a listed Market lot are
+  estimates based on seeded ingredient prices; totals include both listed-lot
+  and estimated portions. Itemized costs add up to the estimate total.
+- The app has no live pantry or farmer inventory ledger. Market lots and field
+  plot records are local rehearsal data; confirm availability and price before
+  sourcing or buying.
+- Typed menu suggestions and photo reading use loopback Ollama only. Kitchen
+  sets a `localOnly` flag at the backend boundary, so an unavailable local model
+  cannot trigger remote inference or paid OpenRouter usage.
+- Model output is treated as a suggestion. It supplies recognized dish names
+  and optional waste tips only; guest-scaled quantities, price estimates,
+  sourcing status, waste routes and safety rules come from local app logic.
+- Allergies are not certified by this demo. Verify the full ingredient list
+  and cross-contact risk before cooking or serving.
 
 ## Tests
 
 ```sh
-# 134 wallet, field, relay, kitchen, assistant and reward checks
+# 140 wallet, field, relay, kitchen, assistant and reward checks
 QML2_IMPORT_PATH=/Applications/LogosBasecamp.app/Contents/Resources/qt/qml \
 QT_PLUGIN_PATH=/Applications/LogosBasecamp.app/Contents/Resources/qt/plugins \
 QT_QPA_PLATFORM_PLUGIN_PATH=$QT_PLUGIN_PATH/platforms \
@@ -304,6 +296,7 @@ QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
 /nix/store/fn7iqppsl6z7ikbspxnjirwdz345w8mj-qtdeclarative-6.9.2/bin/qml tests/Flow.qml
 ```
 
-The kitchen checks cover menu parsing, per-head quantities, plot fallback,
-waste-part coverage, native picks, the safety gate, >20-day filtering,
-memorabilia labelling, loopback validation and fenced JSON replies.
+The kitchen checks cover menu parsing, guest scaling, per-person totals,
+itemized costs and partial-lot estimates, plot fallback, waste-part coverage,
+native picks, safety gates, >20-day filtering, memorabilia labelling, loopback
+validation and local-model reply parsing.

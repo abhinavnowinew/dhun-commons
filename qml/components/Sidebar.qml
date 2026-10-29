@@ -35,7 +35,8 @@ Rectangle {
         { key: "wallet", label: "Wallet", icon: "wallet", badge: "" },
         { key: "node", label: "Node & rewards", icon: "node", badge: "" },
         { key: "room", label: "Coordination room", icon: "room", badge: "" },
-        { key: "landscape", label: "Landscape", icon: "landscape", badge: "" }
+        { key: "landscape", label: "Landscape", icon: "landscape", badge: "" },
+        { key: "case", label: "The 500-acre case", icon: "shield", badge: "" }
     ]
 
     ColumnLayout {
