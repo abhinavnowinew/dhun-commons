@@ -72,12 +72,15 @@ CPU kernels. This is a local workaround, not a Logos release artifact. Prefer an
 official `lez_core` LGX when available, especially before using an account that holds
 value.
 
-The QML pages make no direct network calls. Two exceptions are explicit: the C++
-backend talks to the LEZ sequencer through `lez_core`, and the **Field map** hosts a
+The QML pages make no direct network calls. Three exceptions are explicit: the C++
+backend talks to the LEZ sequencer through `lez_core`; the **Field map** hosts a
 bundled web studio in QtWebView that loads Google satellite tiles and geocoding when a
-runtime Maps key is present. Without a key, or without QtWebView, the field page stays
-on its local plan view. No key is bundled with the module. See
-[FIELD-MAP.md](FIELD-MAP.md) for setup and limits.
+runtime Maps key is present; and **Ask Dhun**, **Ask OpenRouter** and **Check
+capability** call OpenRouter only when an API key is supplied at runtime. Without a
+key the assistant answers from built-in rules, the kitchen planner stays local, and
+the profile card saves the background without a model call. No key is bundled with
+the module. See [FIELD-MAP.md](FIELD-MAP.md) for Maps setup and limits, and
+[Assistant and OpenRouter](../README.md#assistant-and-openrouter) for the key path.
 
 ## Rehearsal flow
 
@@ -402,10 +405,11 @@ and field records stay local.
 
 ## Automated checks
 
-The in-repo flow harness exercises 121 assertions across all proposal kinds, roles,
+The in-repo flow harness exercises 134 assertions across all proposal kinds, roles,
 escrows, covenants, supply conservation, the native field page, field orders, the
-studio bridge events, the Telegram relay queue, the kitchen planner, node-day rewards,
-steward signup and reward payouts:
+studio bridge events, the Telegram relay queue, the kitchen planner, free-text mood
+planning, zero-waste routes, the whole-wallet assistant, profile capability filtering,
+node-day rewards, steward signup and reward payouts:
 
 ```sh
 export QML2_IMPORT_PATH=/Applications/LogosBasecamp.app/Contents/Resources/qt/qml
@@ -420,7 +424,7 @@ export QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software
 Expected final line:
 
 ```text
-qml: SUMMARY checks=121 failures=0 supply=170000 issued=170000
+qml: SUMMARY checks=134 failures=0 supply=170000 issued=170000
 ```
 
 The 170,000 supply is correct: the harness executes the 20,000 DHN Tranche C mint,
@@ -475,6 +479,12 @@ satellite studio is therefore checked live in Basecamp, not by this harness.
 - Kitchen photo reading needs a separate loopback vision server; no model ships with the
   module. The backend reads PNG, JPEG and WebP up to 8 MiB and refuses HEIC. The QML
   client refuses any endpoint that is not `127.0.0.1`, `localhost` or `[::1]`.
+- The assistant and profile review need an OpenRouter key supplied at runtime; the
+  module ships with none. Without a key the assistant uses local rules and the profile
+  card saves the background only. Model output is advisory: capability results are
+  filtered to real project ids and still require an allocation proposal and signatures.
+  Background text and the project list leave the device when a model is called; keys,
+  wallet addresses and the Telegram token do not.
 - The Maps key is stored in the web view's `localStorage`. A `file://` studio cannot use
   website-referrer restrictions; use API restrictions only or local server mode. Rotate
   keys that were shared during testing. No key is included in the repository or LGX.
@@ -488,18 +498,19 @@ satellite studio is therefore checked live in Basecamp, not by this harness.
 | `qml/logic.js` | Proposal/escrow/covenant/formatting logic |
 | `qml/pages/` | Overview, Field map, Kitchen, Market, Projects, Challenges, Wallet, Node & rewards, Room, Landscape |
 | `qml/pages/FieldMap.qml` | Embedded studio host, bridge, native plan view and field calendar |
-| `qml/pages/Kitchen.qml` | Menu photo, model client, sourcing, waste/native cards, safety gate, pantry label |
+| `qml/pages/Kitchen.qml` | Menu photo, free-text prompt, OpenRouter assist, sourcing, zero-waste and native cards, safety gate, pantry label |
 | `qml/pages/Node.qml` | Node and LEZ status, catalog counts, reward rules and payout queue |
-| `qml/kitchen.js` | Dish library, per-head planner, waste and native data, preserves and safety rules |
+| `qml/kitchen.js` | Dish library, per-head planner, free-text mood routes, zero-waste steps, waste and native data, preserves and safety rules |
+| `qml/assistant.js` | Reward-grounded assistant prompts, local fallback answers, capability JSON parsing |
 | `qml/rewards.js` | Reward rules, profiles and earned totals |
 | `qml/web/` | Bundled field studio (Maps, activities, clips, procurement) |
 | `qml/components/StudioWebView.qml` | Guarded QtWebView host with native fallback |
-| `qml/drawers/` | Proposal, purchase, treasury, allocation, project, challenge, profile, about |
-| `src/dhun_commons.rep` | Universal module interface: wallet, refresh, transfer, verify and photo-read slots |
-| `src/dhun_commons_backend.{h,cpp}` | LEZ wallet directory, account mapping, balances, transfers, local photo reader |
+| `qml/drawers/` | Proposal, purchase, treasury, allocation, project, challenge, profile, assistant, about |
+| `src/dhun_commons.rep` | Universal module interface: wallet, refresh, transfer, verify, photo-read, AI chat/status and text-file slots |
+| `src/dhun_commons_backend.{h,cpp}` | LEZ wallet, balances, transfers, local photo reader, runtime OpenRouter client and text-file reader |
 | `metadata.json`, `CMakeLists.txt` | Universal module metadata, `lez_core` dependency and build |
 | `scripts/make-catalog.mjs` | Generates and validates the public Basecamp catalog files |
-| `tests/Flow.qml` | 121-check headless flow harness |
+| `tests/Flow.qml` | 134-check headless flow harness |
 | `docs/FIELD-MAP.md` | Maps key setup, studio architecture, data limits and camera caveat |
 | `docs/KITCHEN.md` | Kitchen workflow, free local vision models, safety rules and limits |
 | `docs/PUBLISHING.md` | Catalog schema, release hosting and Basecamp repository setup |

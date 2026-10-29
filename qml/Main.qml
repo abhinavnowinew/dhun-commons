@@ -37,13 +37,14 @@ Item {
     property var activeProject: null
     property var activeChallenge: null
     property bool aboutOpen: false
+    property bool assistantOpen: false
     property bool webStudioEnabled: true
     property int purchaseInitialQty: 1
     property var seenStudioUpdates: ({})
 
     // Any QML sheet or drawer sits below QtWebView's native macOS view, so the
     // Field map unloads its web view while one is open.
-    readonly property bool overlayOpen: profileOpen || aboutOpen || treasuryOpen || allocateOpen ||
+    readonly property bool overlayOpen: profileOpen || aboutOpen || assistantOpen || treasuryOpen || allocateOpen ||
                                         activeProposal !== null || activeOffer !== null ||
                                         activeProject !== null || activeChallenge !== null
 
@@ -439,6 +440,28 @@ Item {
         showToast("Signing as " + state.roles[roleId].org);
     }
 
+    function saveProfileBackground(personId, background, assessmentJson) {
+        var text = String(background || "").trim();
+        if (!text) return false;
+        var parsed = null;
+        if (assessmentJson) {
+            try { parsed = JSON.parse(String(assessmentJson)); } catch (error) { parsed = null; }
+        }
+        var saved = false;
+        mutate(function (next) {
+            for (var i = 0; i < next.people.length; ++i) {
+                if (next.people[i].id !== personId) continue;
+                next.people[i].background = text.substring(0, 12000);
+                if (parsed) next.people[i].capability = parsed;
+                saved = true;
+            }
+        });
+        if (saved)
+            showToast(parsed ? "Background and model assessment saved on this device"
+                             : "Background saved on this device · no model called");
+        return saved;
+    }
+
     function navigate(pageKey) {
         if (pageOrder.indexOf(pageKey) === -1) return;
         activePage = pageKey;
@@ -460,6 +483,7 @@ Item {
         activeChallenge = null;
         aboutOpen = false;
         profileOpen = false;
+        assistantOpen = false;
     }
 
     function closeTop() {
@@ -469,6 +493,7 @@ Item {
         else if (allocateOpen) allocateOpen = false;
         else if (activeChallenge) activeChallenge = null;
         else if (activeProject) activeProject = null;
+        else if (assistantOpen) assistantOpen = false;
         else if (profileOpen) profileOpen = false;
         else if (aboutOpen) aboutOpen = false;
     }
@@ -1619,6 +1644,7 @@ Item {
         activeChallenge = null;
         aboutOpen = false;
         profileOpen = false;
+        assistantOpen = false;
         purchaseInitialQty = 1;
         seenStudioUpdates = ({});
         activePersonId = "person-funder";
@@ -1919,15 +1945,95 @@ Item {
         z: 135
         app: app.state
         open: app.profileOpen
+        assistantHost: app
         activePersonId: app.activePersonId
         onClose: app.profileOpen = false
         onCreateProfile: function (name, place, note) {
             if (app.addPerson({ name: name, place: place, note: note })) app.profileOpen = false;
         }
         onSelectProfile: function (id) { app.selectPerson(id) }
+        onSaveBackground: function (personId, background, assessmentJson) {
+            app.saveProfileBackground(personId, background, assessmentJson);
+        }
+        onStartAllocation: function (projectId) {
+            app.profileOpen = false;
+            app.openAllocate(projectId);
+        }
+        onOpenProjects: {
+            app.profileOpen = false;
+            app.navigate("projects");
+        }
         onOpenRewards: {
             app.profileOpen = false;
             app.navigate("node");
+        }
+    }
+
+    AssistantDrawer {
+        id: assistantDrawer
+        anchors.fill: parent
+        z: 138
+        app: app
+        open: app.assistantOpen
+        backend: app.relayBackend
+        backendReady: app.relayHosted && app.relayReady && app.relayBackend !== null
+        onClose: app.assistantOpen = false
+        onNavigate: function (page) {
+            app.assistantOpen = false;
+            app.navigate(page);
+        }
+        onOpenProfile: {
+            app.assistantOpen = false;
+            app.profileOpen = true;
+        }
+        onOpenAllocate: function (projectId) {
+            app.assistantOpen = false;
+            app.openAllocate(projectId);
+        }
+    }
+
+    Rectangle {
+        id: assistantLauncher
+        z: 90
+        visible: !app.assistantOpen
+        width: assistantLauncherRow.implicitWidth + 30
+        height: 42
+        radius: 21
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.rightMargin: 26
+        anchors.bottomMargin: 24
+        color: launcherMouse.containsMouse ? Theme.forestSoft : Theme.forest
+        border.width: 1
+        border.color: "#3B5A44"
+
+        RowLayout {
+            id: assistantLauncherRow
+            anchors.centerIn: parent
+            spacing: 8
+
+            Icon {
+                name: "leaf"
+                color: Theme.lime
+                width: 14
+                height: 14
+            }
+
+            Text {
+                text: "Ask Dhun"
+                color: "#F4F7E9"
+                font.family: Theme.uiFont
+                font.pixelSize: 10
+                font.weight: Font.DemiBold
+            }
+        }
+
+        MouseArea {
+            id: launcherMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: app.assistantOpen = true
         }
     }
 

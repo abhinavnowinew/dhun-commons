@@ -1102,6 +1102,7 @@ function emptyPlan(reason) {
         lines: [],
         groups: [],
         waste: [],
+        zeroWaste: [],
         natives: [],
         preserves: [],
         memorabilia: null,
@@ -1160,6 +1161,7 @@ function buildPlan(state, options) {
         lines: lines,
         groups: groupByZone(lines),
         waste: wasteFor(lines),
+        zeroWaste: zeroWasteFor(parsed, lines),
         natives: nativesFor(parsed, lines, month),
         preserves: preserves,
         allowedPreserves: allowedPreserves,
@@ -1271,4 +1273,199 @@ function modelsUrl(endpoint) {
     if (/\/v1\/chat\/completions$/.test(base)) return base.replace(/\/chat\/completions$/, "/models");
     if (/\/v1$/.test(base)) return base + "/models";
     return base + "/v1/models";
+}
+
+var monthRoutes = {
+    rabi: {
+        dishes: ["bajra_roti", "moth_dal", "sarson_saag", "gajar_halwa"],
+        note: "Rabi season · millet bread, desert beans and mustard greens."
+    },
+    kharif: {
+        dishes: ["jowar_bhakri", "bhindi_masala", "moth_dal", "anar_chaat"],
+        note: "Kharif season · sorghum, okra and orchard fruit."
+    },
+    zaid: {
+        dishes: ["mung_khichdi", "lauki_sabzi", "kheera_raita", "tarbooz_cooler"],
+        note: "Zaid season · gourds, mung and melon coolers."
+    }
+};
+
+var moodRoutes = [
+    {
+        id: "cold",
+        words: ["cold", "winter", "chilly", "freezing", "rainy", "monsoon", "snow"],
+        dishes: ["sarson_saag", "bajra_roti", "moth_dal", "gajar_halwa"],
+        note: "Warming rabi plates: slow-cooked greens, millet bread and a ghee finish."
+    },
+    {
+        id: "tired",
+        words: ["tired", "exhausted", "drained", "low", "long day", "hungry", "weak"],
+        dishes: ["mung_khichdi", "bajra_roti", "amla_murabba", "kheera_raita"],
+        note: "Soft, slow-release plates for a long day. This is a menu suggestion, not a health claim."
+    },
+    {
+        id: "hot",
+        words: ["hot", "heat", "summer", "sweaty", "thirsty", "scorching"],
+        dishes: ["tarbooz_cooler", "kheera_raita", "lauki_sabzi", "mung_khichdi"],
+        note: "Cooling zaid plates built around gourds and pressed fruit."
+    },
+    {
+        id: "light",
+        words: ["light", "sick", "unwell", "stomach", "comfort", "digest", "gentle"],
+        dishes: ["mung_khichdi", "lauki_sabzi", "kheera_raita"],
+        note: "Plain, gentle cooking. No medical claim: if someone is ill, follow local medical advice."
+    },
+    {
+        id: "festive",
+        words: ["festive", "celebration", "party", "feast", "birthday", "guests", "visitors"],
+        dishes: ["gajar_halwa", "besan_gatta", "chana_curry", "anar_chaat"],
+        note: "A shared thali with a sweet, a dumpling and a fruit plate."
+    },
+    {
+        id: "fresh",
+        words: ["fresh", "green", "salad", "clean", "crisp"],
+        dishes: ["mung_sprouts", "kheera_raita", "dhaniya_chutney", "palak_saag"],
+        note: "Green plates with a fresh chutney and a sprouted pulse."
+    }
+];
+
+function interpretPrompt(text, month) {
+    var raw = String(text === undefined || text === null ? "" : text).trim();
+    if (!raw)
+        return { ok: false, error: "Type a dish, a mood or what you feel like eating." };
+
+    var normalized = normalize(raw);
+    var dishes = [];
+    var seen = {};
+    var kind = "";
+    var note = "";
+
+    var direct = dishForLine(raw);
+    if (direct) {
+        seen[direct.id] = true;
+        dishes.push(direct);
+        kind = "dish";
+        note = "Read the dish name directly from your text.";
+    }
+
+    for (var r = 0; r < moodRoutes.length; ++r) {
+        var route = moodRoutes[r];
+        var hit = false;
+        for (var w = 0; w < route.words.length; ++w) {
+            if (normalized.indexOf(route.words[w]) !== -1) { hit = true; break; }
+        }
+        if (!hit) continue;
+        for (var d = 0; d < route.dishes.length; ++d) {
+            var dish = dishById(route.dishes[d]);
+            if (dish && !seen[dish.id]) {
+                seen[dish.id] = true;
+                dishes.push(dish);
+            }
+        }
+        if (!kind) { kind = "mood"; note = route.note; }
+        break;
+    }
+
+    if (!dishes.length) {
+        var season = seasonForMonth(month);
+        var fallback = monthRoutes[season ? season.id : "rabi"] || monthRoutes.rabi;
+        for (var f = 0; f < fallback.dishes.length; ++f) {
+            var seasonal = dishById(fallback.dishes[f]);
+            if (seasonal && !seen[seasonal.id]) {
+                seen[seasonal.id] = true;
+                dishes.push(seasonal);
+            }
+        }
+        kind = "season";
+        note = fallback.note + " No dish or mood keyword matched, so the seasonal thali was used.";
+    }
+
+    if (dishes.length > 5) dishes = dishes.slice(0, 5);
+    var guestMatch = raw.match(/(\d{1,3})\s*(?:guests?|people|persons?|pax|heads?)/i);
+    return {
+        ok: true,
+        kind: kind,
+        dishes: dishes,
+        note: note,
+        guests: guestMatch ? clampInt(guestMatch[1], 1, 500) : 0,
+        text: dishes.map(function (item) { return item.name; }).join("\n")
+    };
+}
+
+function buildPromptPlan(state, options) {
+    var opts = options || {};
+    var interpreted = interpretPrompt(opts.promptText, opts.month);
+    if (!interpreted.ok) return emptyPlan(interpreted.error);
+    var plan = buildPlan(state, {
+        guests: opts.guests,
+        month: opts.month,
+        menuText: interpreted.text,
+        safety: opts.safety,
+        now: opts.now
+    });
+    if (plan.ok) {
+        plan.prompt = {
+            text: String(opts.promptText || ""),
+            kind: interpreted.kind,
+            note: interpreted.note,
+            dishes: interpreted.dishes.map(function (item) { return item.name; }),
+            suggestedGuests: interpreted.guests
+        };
+        plan.notes = [interpreted.note].concat(plan.notes);
+    }
+    return plan;
+}
+
+function zeroWasteFor(parsed, lines) {
+    var kinds = {};
+    var ids = {};
+    for (var d = 0; d < parsed.dishes.length; ++d) {
+        var dish = dishById(parsed.dishes[d].id);
+        if (!dish) continue;
+        kinds[dish.kind] = true;
+        var keys = Object.keys(dish.perHead);
+        for (var k = 0; k < keys.length; ++k) ids[keys[k]] = true;
+    }
+    var steps = [];
+    if (kinds.veg) {
+        steps.push({
+            title: "Cook the whole vegetable",
+            detail: "Wash stems and tender leaves into the same pot. Keep tougher peels and roots separate for stock or compost; do not put soiled trim back on a serving plate."
+        });
+    }
+    if (kinds.dal || kinds.grain) {
+        steps.push({
+            title: "Keep the cooking liquid",
+            detail: "Use measured soaking water in the pot and loosen the dal with it. Cool and refrigerate any surplus within two hours; reheat only once."
+        });
+    }
+    if (kinds.bread) {
+        steps.push({
+            title: "Plan the last roti",
+            detail: "Cook to the guest count, then dry any untouched roti for a crisp snack or feed it to livestock. Cooked bread that reached a plate is not preserved."
+        });
+    }
+    if (ids.doodh) {
+        steps.push({
+            title: "Use the whey",
+            detail: "Whey from curd or paneer can go into dough or dal the same day. Keep it cold and discard it if it smells sour."
+        });
+    }
+    if (ids.nimbu) {
+        steps.push({
+            title: "Salt the citrus peel",
+            detail: "Press clean lime peel with salt for a small condiment jar. Keep it labelled and refrigerated; do not claim a long shelf life without a tested method."
+        });
+    }
+    if (!steps.length) {
+        steps.push({
+            title: "Route trim by destination",
+            detail: "Keep clean trim for stock, send soiled trim to compost and keep anything that touched a plate out of preservation."
+        });
+    }
+    steps.push({
+        title: "Close the loop",
+        detail: "Count what came back on plates, log it, and reduce the next purchase by that amount. Compost what cannot be eaten safely."
+    });
+    return steps;
 }

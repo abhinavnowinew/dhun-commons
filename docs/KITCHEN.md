@@ -13,8 +13,15 @@ The Kitchen tab turns a menu for a number of guests into four things:
 The planner is deterministic and offline. No model is required, and no photo
 leaves the machine. A local vision model can be used as an optional shortcut
 for reading a menu photo; it only transcribes dish names and the guest count.
-Quantities, prices, sourcing and safety rules always come from the built-in
-planner in [`qml/kitchen.js`](../qml/kitchen.js).
+A typed dish, mood or occasion is matched against the built-in dish library and
+seasonal routes before any model is involved. Quantities, prices, sourcing,
+zero-waste steps and safety rules always come from the built-in planner in
+[`qml/kitchen.js`](../qml/kitchen.js).
+
+An optional OpenRouter chat call can suggest dishes or waste tips when a key is
+configured at runtime (see [Assistant and OpenRouter](../README.md#assistant-and-openrouter)).
+It is additive: the local zero-waste list, pantry gate and safety blockers still
+come from the deterministic planner.
 
 ## Using the tab
 
@@ -48,6 +55,33 @@ sample menus in `qml/kitchen.js` are:
 | Rabi thali | 24 | December |
 | Kharif thali | 18 | September |
 | Zaid thali | 30 | May |
+
+## Free text: dish, mood or occasion
+
+The **Dish, mood or anything** card takes a plain sentence such as
+*"I feel cold and tired. Lunch for 20 people, nothing wasted."* Pressing
+**Plan it** runs the built-in matcher:
+
+1. a direct dish or menu name wins first;
+2. otherwise a mood word routes the plan: cold, tired, hot, light, festive,
+   fresh;
+3. otherwise it falls back to the dishes of the current season (rabi, kharif,
+   zaid);
+4. a guest number in the text updates the guest count.
+
+The result is labelled with its provenance (*mood match*, *dish match* or
+*seasonal fallback*). The plan then shows the sourcing list and a **Cook
+without waste** card derived from the actual lines: vegetable stems and leaves,
+dal soaking water, the last roti, whey, citrus peel and trim routing, each with
+a caution. The card also explains how to close the loop back to compost.
+
+**Ask OpenRouter** is a separate button. It sends the prompt plus the allowed
+dish ids and current farm offers to the model, asks for strict JSON
+(`dishes`, `extras`, `servings`, `wasteTips`, `notes`), and only accepts dish
+ids from the local library. Model tips are shown under **MODEL TIPS** with the
+model name and a note that the local waste list, pantry gate and safety
+blockers were not replaced. If no key is configured or the call fails, the
+deterministic plan stays on screen and the tab says so.
 
 ## Optional local vision model
 
@@ -246,6 +280,10 @@ The pantry is deliberately conservative.
 - Field-plot costs are estimates based on the seed ingredient price.
 - Photos are read on the local machine. The built-in planner never calls a
   model; only **Read photo** does, and only against a loopback endpoint.
+- **Ask OpenRouter** calls `https://openrouter.ai/api/v1/chat/completions`
+  only when a key is supplied at runtime. It is model-assisted advice, not the
+  planner, and it never changes sourcing prices, the safety gate or shelf-life
+  rules.
 - Model output is treated as a transcript, not as advice. The model supplies
   dish names and, when it can, the guest count; every quantity, price, waste
   use, native pick and shelf life comes from `qml/kitchen.js`.
@@ -257,7 +295,7 @@ The pantry is deliberately conservative.
 ## Tests
 
 ```sh
-# 121 wallet, field, relay, kitchen and reward checks
+# 134 wallet, field, relay, kitchen, assistant and reward checks
 QML2_IMPORT_PATH=/Applications/LogosBasecamp.app/Contents/Resources/qt/qml \
 QT_PLUGIN_PATH=/Applications/LogosBasecamp.app/Contents/Resources/qt/plugins \
 QT_QPA_PLATFORM_PLUGIN_PATH=$QT_PLUGIN_PATH/platforms \

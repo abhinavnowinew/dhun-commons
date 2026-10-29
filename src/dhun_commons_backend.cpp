@@ -31,6 +31,12 @@ const char kStorageName[] = "storage.json";
 const char kMappingName[] = "roles.json";
 const char kTokenDecimals = 9;
 const int kMaxTelegramSnapshot = 256 * 1024;
+const char kOpenRouterUrl[] = "https://openrouter.ai/api/v1/chat/completions";
+const char kOpenRouterDefaultModel[] = "openai/gpt-4o";
+const int kMaxAiMessages = 40;
+const int kMaxAiPromptChars = 24000;
+const int kMaxTextFileBytes = 256 * 1024;
+const int kMaxTextChars = 120000;
 
 struct Role {
     const char* key;
@@ -54,6 +60,13 @@ QJsonObject failureObject(const QString& error)
     obj.insert(QStringLiteral("success"), false);
     obj.insert(QStringLiteral("error"), error);
     return obj;
+}
+
+QString redactSecret(QString text, const QString& secret)
+{
+    if (secret.size() >= 8 && text.contains(secret))
+        text.replace(secret, QStringLiteral("[redacted]"));
+    return text;
 }
 
 bool isHexAccountId(const QString& value)
@@ -1139,5 +1152,309 @@ QString DhunCommonsBackend::startMenuPhoto(QString path,
         result.insert(QStringLiteral("usage"), usage);
     result.insert(QStringLiteral("success"), true);
     result.insert(QStringLiteral("content"), content);
+    return jsonCompact(result);
+}
+
+DhunCommonsBackend::AiConfig DhunCommonsBackend::aiConfig() const
+{
+    AiConfig cfg;
+    cfg.model = qEnvironmentVariable("OPENROUTER_MODEL").trimmed();
+    cfg.referer = qEnvironmentVariable("OPENROUTER_SITE_URL").trimmed();
+    cfg.title = qEnvironmentVariable("OPENROUTER_SITE_NAME").trimmed();
+    cfg.key = qEnvironmentVariable("OPENROUTER_API_KEY").trimmed();
+    if (!cfg.key.isEmpty())
+        cfg.source = QStringLiteral("env");
+
+    const QString overridePath = qEnvironmentVariable("DHUN_OPENROUTER_CONFIG").trimmed();
+    cfg.configPath = overridePath.isEmpty()
+        ? QDir(QDir::homePath() + QStringLiteral("/.config/dhun-commons"))
+              .filePath(QStringLiteral("openrouter.json"))
+        : overridePath;
+
+    if (cfg.key.isEmpty()) {
+        QFile file(cfg.configPath);
+        if (file.open(QIODevice::ReadOnly)) {
+            const QByteArray raw = file.read(64 * 1024);
+            file.close();
+            const QJsonObject stored = QJsonDocument::fromJson(raw).object();
+            cfg.key = stored.value(QStringLiteral("apiKey")).toString().trimmed();
+            if (cfg.key.isEmpty())
+                cfg.key = stored.value(QStringLiteral("key")).toString().trimmed();
+            if (cfg.model.isEmpty())
+                cfg.model = stored.value(QStringLiteral("model")).toString().trimmed();
+            if (cfg.referer.isEmpty())
+                cfg.referer = stored.value(QStringLiteral("referer")).toString().trimmed();
+            if (cfg.title.isEmpty())
+                cfg.title = stored.value(QStringLiteral("title")).toString().trimmed();
+            if (!cfg.key.isEmpty())
+                cfg.source = QStringLiteral("file");
+            const QFile::Permissions perms = QFileInfo(cfg.configPath).permissions();
+            cfg.insecureFile = perms.testAnyFlag(QFileDevice::ReadGroup)
+                || perms.testAnyFlag(QFileDevice::ReadOther)
+                || perms.testAnyFlag(QFileDevice::WriteGroup)
+                || perms.testAnyFlag(QFileDevice::WriteOther);
+        }
+    }
+
+    if (cfg.model.isEmpty())
+        cfg.model = QString::fromLatin1(kOpenRouterDefaultModel);
+    if (cfg.referer.isEmpty())
+        cfg.referer = QStringLiteral("https://dhun-commons.local");
+    if (cfg.title.isEmpty())
+        cfg.title = QStringLiteral("Dhun Commons");
+    return cfg;
+}
+
+QString DhunCommonsBackend::aiStatus()
+{
+    const AiConfig cfg = aiConfig();
+    QJsonObject result;
+    result.insert(QStringLiteral("success"), true);
+    result.insert(QStringLiteral("configured"), !cfg.key.isEmpty());
+    result.insert(QStringLiteral("source"), cfg.source);
+    result.insert(QStringLiteral("model"), cfg.model);
+    result.insert(QStringLiteral("endpoint"), QString::fromLatin1(kOpenRouterUrl));
+    result.insert(QStringLiteral("configPath"), cfg.configPath);
+    result.insert(QStringLiteral("insecureFile"), cfg.insecureFile);
+    result.insert(QStringLiteral("mode"), QStringLiteral("openrouter-remote"));
+    result.insert(QStringLiteral("note"),
+                  cfg.key.isEmpty()
+                      ? QStringLiteral("No OpenRouter key is configured. Set OPENROUTER_API_KEY before "
+                                       "launching Basecamp, or write the key to the config file path "
+                                       "and chmod 600. The key is read at runtime and never stored by "
+                                       "this module.")
+                      : QStringLiteral("Model requests go from the module backend process to "
+                                       "openrouter.ai. Prompts leave this device. The key stays in the "
+                                       "environment or the private config file and is never logged."));
+    if (cfg.insecureFile) {
+        result.insert(QStringLiteral("warning"),
+                      QStringLiteral("The OpenRouter config file is readable or writable by other "
+                                     "users. Run chmod 600 on it."));
+    }
+    return jsonCompact(result);
+}
+
+QString DhunCommonsBackend::aiChat(QString requestJson)
+{
+    const QJsonObject request = QJsonDocument::fromJson(requestJson.toUtf8()).object();
+    if (request.isEmpty())
+        return jsonCompact(failureObject(QStringLiteral("The assistant request was not valid JSON.")));
+    if (request.contains(QStringLiteral("success")) && !request.value(QStringLiteral("success")).toBool(true))
+        return jsonCompact(failureObject(QStringLiteral("The assistant request was empty.")));
+
+    const QJsonArray incoming = request.value(QStringLiteral("messages")).toArray();
+    if (incoming.isEmpty())
+        return jsonCompact(failureObject(QStringLiteral("The assistant request had no messages.")));
+
+    QJsonArray messages;
+    int totalChars = 0;
+    for (const QJsonValue& value : incoming) {
+        if (messages.size() >= kMaxAiMessages)
+            break;
+        const QJsonObject entry = value.toObject();
+        QString role = entry.value(QStringLiteral("role")).toString().trimmed().toLower();
+        if (role != QStringLiteral("system") && role != QStringLiteral("assistant"))
+            role = QStringLiteral("user");
+        QString content = entry.value(QStringLiteral("content")).toString();
+        if (content.trimmed().isEmpty())
+            continue;
+        totalChars += content.size();
+        if (totalChars > kMaxAiPromptChars)
+            return jsonCompact(failureObject(
+                QStringLiteral("The conversation is too long for one request. Start a new thread or "
+                               "shorten the pasted text.")));
+        QJsonObject clean;
+        clean.insert(QStringLiteral("role"), role);
+        clean.insert(QStringLiteral("content"), content);
+        messages.append(clean);
+    }
+    if (messages.isEmpty())
+        return jsonCompact(failureObject(QStringLiteral("The assistant request had no usable messages.")));
+
+    const AiConfig cfg = aiConfig();
+    if (cfg.key.isEmpty()) {
+        QJsonObject result = failureObject(
+            QStringLiteral("No OpenRouter key is configured, so no model was called. Set "
+                           "OPENROUTER_API_KEY before launching Basecamp, or write "
+                           "{ \"apiKey\": \"...\" } to ") + cfg.configPath
+            + QStringLiteral(" and chmod 600."));
+        result.insert(QStringLiteral("configured"), false);
+        result.insert(QStringLiteral("configPath"), cfg.configPath);
+        return jsonCompact(result);
+    }
+
+    QString model = request.value(QStringLiteral("model")).toString().trimmed();
+    if (model.isEmpty())
+        model = cfg.model;
+    static const QRegularExpression modelRe(QStringLiteral("^[A-Za-z0-9._:/-]{2,96}$"));
+    if (!modelRe.match(model).hasMatch())
+        return jsonCompact(failureObject(QStringLiteral("That model name is not a valid OpenRouter model id.")));
+
+    double temperature = request.value(QStringLiteral("temperature")).toDouble(0.2);
+    temperature = qBound(0.0, temperature, 2.0);
+    int maxTokens = request.value(QStringLiteral("maxTokens")).toInt(900);
+    maxTokens = qBound(64, maxTokens, 4096);
+
+    QJsonObject payload;
+    payload.insert(QStringLiteral("model"), model);
+    payload.insert(QStringLiteral("messages"), messages);
+    payload.insert(QStringLiteral("temperature"), temperature);
+    payload.insert(QStringLiteral("max_tokens"), maxTokens);
+
+    QNetworkAccessManager network;
+    QNetworkRequest httpRequest{QUrl(QString::fromLatin1(kOpenRouterUrl))};
+    httpRequest.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+    httpRequest.setRawHeader("Authorization", QByteArray("Bearer ") + cfg.key.toUtf8());
+    httpRequest.setRawHeader("HTTP-Referer", cfg.referer.toUtf8());
+    httpRequest.setRawHeader("X-Title", cfg.title.toUtf8());
+    httpRequest.setTransferTimeout(55000);
+
+    const qint64 startedMs = QDateTime::currentMSecsSinceEpoch();
+    QNetworkReply* reply = network.post(httpRequest, QJsonDocument(payload).toJson(QJsonDocument::Compact));
+
+    QEventLoop loop;
+    QTimer guard;
+    guard.setSingleShot(true);
+    QObject::connect(&guard, &QTimer::timeout, &loop, &QEventLoop::quit);
+    QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    guard.start(60000);
+    loop.exec();
+    guard.stop();
+
+    QJsonObject result;
+    result.insert(QStringLiteral("model"), model);
+    result.insert(QStringLiteral("provider"), QStringLiteral("openrouter"));
+    result.insert(QStringLiteral("seconds"),
+                  (QDateTime::currentMSecsSinceEpoch() - startedMs) / 1000.0);
+
+    if (!reply->isFinished()) {
+        reply->abort();
+        reply->deleteLater();
+        result = failureObject(QStringLiteral("OpenRouter did not answer within 60 seconds."));
+        result.insert(QStringLiteral("model"), model);
+        return jsonCompact(result);
+    }
+
+    const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    const QByteArray body = reply->readAll();
+    QString networkError = reply->errorString();
+    const bool transportFailed = reply->error() != QNetworkReply::NoError && status == 0;
+    reply->deleteLater();
+
+    networkError = redactSecret(networkError, cfg.key);
+    result.insert(QStringLiteral("httpStatus"), status);
+
+    if (transportFailed) {
+        result.insert(QStringLiteral("success"), false);
+        result.insert(QStringLiteral("error"),
+                      QStringLiteral("OpenRouter could not be reached: ") + networkError);
+        return jsonCompact(result);
+    }
+
+    const QJsonObject parsed = QJsonDocument::fromJson(body).object();
+    if (status < 200 || status >= 300) {
+        QString detail = parsed.value(QStringLiteral("error")).toObject()
+                             .value(QStringLiteral("message")).toString().trimmed();
+        if (detail.isEmpty())
+            detail = QString::fromUtf8(body).left(300).trimmed();
+        detail = redactSecret(detail, cfg.key);
+        result.insert(QStringLiteral("success"), false);
+        result.insert(QStringLiteral("error"),
+                      QStringLiteral("OpenRouter returned HTTP ") + QString::number(status)
+                          + (detail.isEmpty() ? QString() : QStringLiteral(": ") + detail));
+        return jsonCompact(result);
+    }
+
+    const QJsonArray choices = parsed.value(QStringLiteral("choices")).toArray();
+    QString content;
+    if (!choices.isEmpty()) {
+        const QJsonValue value = choices.first().toObject()
+                                     .value(QStringLiteral("message")).toObject()
+                                     .value(QStringLiteral("content"));
+        if (value.isString()) {
+            content = value.toString();
+        } else if (value.isArray()) {
+            QStringList parts;
+            for (const QJsonValue& part : value.toArray()) {
+                const QString text = part.toObject().value(QStringLiteral("text")).toString();
+                if (!text.isEmpty())
+                    parts.append(text);
+            }
+            content = parts.join(QLatin1Char(' '));
+        }
+    }
+
+    if (content.trimmed().isEmpty()) {
+        result.insert(QStringLiteral("success"), false);
+        result.insert(QStringLiteral("error"),
+                      QStringLiteral("OpenRouter returned no text. Check the model id and try again."));
+        return jsonCompact(result);
+    }
+
+    const QString servedModel = parsed.value(QStringLiteral("model")).toString().trimmed();
+    if (!servedModel.isEmpty())
+        result.insert(QStringLiteral("model"), servedModel);
+    const QJsonObject usage = parsed.value(QStringLiteral("usage")).toObject();
+    if (!usage.isEmpty())
+        result.insert(QStringLiteral("usage"), usage);
+    result.insert(QStringLiteral("success"), true);
+    result.insert(QStringLiteral("content"), content);
+    return jsonCompact(result);
+}
+
+QString DhunCommonsBackend::readTextFile(QString path)
+{
+    QString resolved = path.trimmed();
+    if (resolved.startsWith(QStringLiteral("file://")))
+        resolved = QUrl(resolved).toLocalFile();
+    if (resolved.isEmpty())
+        return jsonCompact(failureObject(QStringLiteral("No file was chosen.")));
+
+    const QFileInfo info(resolved);
+    if (!info.exists() || !info.isFile())
+        return jsonCompact(failureObject(QStringLiteral("The chosen file could not be found.")));
+
+    const QString suffix = info.suffix().toLower();
+    if (suffix == QStringLiteral("pdf") || suffix == QStringLiteral("doc")
+        || suffix == QStringLiteral("docx") || suffix == QStringLiteral("pages")) {
+        return jsonCompact(failureObject(
+            QStringLiteral("This module does not extract PDF or Word text. Export the document as "
+                           ".txt or .md, or paste the background into the profile field.")));
+    }
+    static const QSet<QString> allowed{QStringLiteral("txt"), QStringLiteral("md"),
+                                       QStringLiteral("markdown"), QStringLiteral("csv"),
+                                       QStringLiteral("json"), QStringLiteral("text")};
+    if (!allowed.contains(suffix)) {
+        return jsonCompact(failureObject(
+            QStringLiteral("Only plain-text files (.txt, .md, .csv, .json) can be read. Convert "
+                           "other formats or paste the text.")));
+    }
+    if (info.size() > kMaxTextFileBytes) {
+        return jsonCompact(failureObject(
+            QStringLiteral("The file is larger than 256 KB. Trim it or paste the relevant part.")));
+    }
+
+    QFile file(resolved);
+    if (!file.open(QIODevice::ReadOnly))
+        return jsonCompact(failureObject(QStringLiteral("The chosen file could not be opened.")));
+    const QByteArray bytes = file.readAll();
+    file.close();
+    if (bytes.isEmpty())
+        return jsonCompact(failureObject(QStringLiteral("The chosen file is empty.")));
+    if (bytes.contains('\0'))
+        return jsonCompact(failureObject(QStringLiteral("The chosen file is not plain UTF-8 text.")));
+
+    QString text = QString::fromUtf8(bytes);
+    const bool truncated = text.size() > kMaxTextChars;
+    if (truncated)
+        text = text.left(kMaxTextChars);
+
+    QJsonObject result;
+    result.insert(QStringLiteral("success"), true);
+    result.insert(QStringLiteral("name"), info.fileName());
+    result.insert(QStringLiteral("characters"), text.size());
+    result.insert(QStringLiteral("bytes"), static_cast<double>(bytes.size()));
+    result.insert(QStringLiteral("truncated"), truncated);
+    result.insert(QStringLiteral("text"), text);
     return jsonCompact(result);
 }

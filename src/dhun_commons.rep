@@ -12,6 +12,9 @@ class DhunCommons
     SLOT(QString readPhotoBase64(QString path))
     SLOT(QString probeModelServer(QString endpoint))
     SLOT(QString startMenuPhoto(QString path, QString endpoint, QString model, QString prompt))
+    SLOT(QString aiChat(QString requestJson))
+    SLOT(QString aiStatus())
+    SLOT(QString readTextFile(QString path))
 
     PROP(QString chainStatus="uninitialized" READONLY)
     PROP(QString chainNotice="" READONLY)

@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Window
 import "../qml/kitchen.js" as Kitchen
+import "../qml/assistant.js" as Assistant
 
 Window {
     id: win
@@ -413,6 +414,57 @@ Window {
         for (var rw3 = 0; rw3 < app.state.rewards.length; ++rw3)
             if (app.state.rewards[rw3].proposalId === payout.id && app.state.rewards[rw3].status === "paid") paidEntries += 1;
         check("paid entries carry the payout proposal", paidEntries === 1, paidEntries);
+
+        var assistantIdeas = Assistant.rewardIdeas(app);
+        check("assistant grounds at least one DHN action", assistantIdeas.length >= 1, assistantIdeas.length);
+        var hasKitchenIdea = false;
+        for (var ai = 0; ai < assistantIdeas.length; ++ai)
+            if (assistantIdeas[ai].id === "kitchen-plan") hasKitchenIdea = true;
+        check("assistant suggests the kitchen reward", hasKitchenIdea, assistantIdeas.length);
+        var assistantContext = Assistant.context(app);
+        check("assistant context is labelled rehearsal data",
+              String(assistantContext.note || "").indexOf("rehearsal") !== -1,
+              assistantContext.note);
+
+        var mood = Kitchen.interpretPrompt("I feel cold and tired. Lunch for 20 people.", 12);
+        check("kitchen reads a mood prompt", mood.ok && mood.kind === "mood" && mood.dishes.length >= 2,
+              mood.ok ? mood.kind : "none");
+        check("kitchen reads guests from free text", mood.guests === 20, mood.guests);
+        var moodPlan = Kitchen.buildPromptPlan(app, {
+            promptText: "I feel cold and tired. Lunch for 20 people.",
+            guests: 20,
+            month: 12,
+            safety: {}
+        });
+        check("mood prompt builds a sourcing plan", moodPlan.ok && moodPlan.totals.lines > 0,
+              moodPlan.ok ? moodPlan.totals.lines : moodPlan.reason);
+        check("mood plan carries zero-waste steps", moodPlan.ok && moodPlan.zeroWaste.length >= 2,
+              moodPlan.ok ? moodPlan.zeroWaste.length : "none");
+        check("mood plan records its provenance", moodPlan.ok && moodPlan.prompt && moodPlan.prompt.kind === "mood",
+              moodPlan.ok && moodPlan.prompt ? moodPlan.prompt.kind : "missing");
+
+        var assessment = Assistant.parseAssessment(
+            '{"summary":"Nursery and seed work.","strengths":["Nursery beds"],' +
+            '"projectIds":["PRJ-01","PRJ-99"],"fitNotes":"Fits field work.","gaps":"No formal certificate."}',
+            app.state.projects);
+        check("assessment keeps only real project ids",
+              assessment && assessment.projectIds.length === 1 && assessment.projectIds[0] === "PRJ-01",
+              assessment ? assessment.projectIds.join(",") : "null");
+        check("fabricated project ids never reach allocation",
+              assessment && assessment.projectIds.indexOf("PRJ-99") === -1,
+              assessment ? assessment.projectIds.join(",") : "null");
+        check("background save persists on the profile",
+              app.saveProfileBackground(steward.id, "Ten years of nursery and seed-bank work.", JSON.stringify(assessment)) === true &&
+              String(app.personById(steward.id).background || "").length > 10,
+              app.personById(steward.id).background ? "saved" : "missing");
+        check("capability assessment stays with the profile",
+              app.personById(steward.id).capability &&
+              app.personById(steward.id).capability.projectIds[0] === "PRJ-01",
+              app.personById(steward.id).capability ? "saved" : "missing");
+        check("assistant offline answer avoids model claims",
+              Assistant.localAnswer(app, "How do I earn DHN?").indexOf("No OpenRouter key") === -1 &&
+              Assistant.localAnswer(app, "What is the weather?").indexOf("no model was called") !== -1,
+              "local answer checked");
 
         console.log("SUMMARY checks=" + win.checks + " failures=" + win.failures + " supply=" + walletSum(app) + " issued=" + app.state.token.issued);
         finishTimer.start();

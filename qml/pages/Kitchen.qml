@@ -6,6 +6,7 @@ import "../theme.js" as Theme
 import "../logic.js" as Logic
 import "../data.js" as Data
 import "../kitchen.js" as Kitchen
+import "../assistant.js" as Assistant
 import "../components"
 
 Item {
@@ -17,6 +18,9 @@ Item {
     property int guests: 24
     property int month: 12
     property string menuText: Kitchen.sampleMenus[0].text
+    property string promptText: ""
+    property var promptInfo: null
+    property var modelTips: []
     property string photoPath: ""
     property string modelEndpoint: "http://127.0.0.1:11434/v1"
     property string modelName: "qwen2.5vl:3b"
@@ -51,6 +55,9 @@ Item {
         guests = sample.guests;
         month = sample.month;
         photoPath = "";
+        promptText = "";
+        promptInfo = null;
+        modelTips = [];
         setMenuText(sample.text);
         modelProvenance = "Built-in planner · offline";
         modelStatus = "Sample menu loaded. No model called.";
@@ -69,6 +76,100 @@ Item {
                 dehydrator: dehydrator
             },
             now: Date.now()
+        });
+        if (plan && plan.ok && promptInfo) plan.prompt = promptInfo;
+    }
+
+    function planFromPrompt() {
+        if (!String(promptText || "").trim().length) {
+            modelStatus = "Type a dish, a mood or anything you want to cook.";
+            return;
+        }
+        var interpreted = Kitchen.interpretPrompt(promptText, month);
+        if (!interpreted.ok) {
+            modelStatus = interpreted.error;
+            return;
+        }
+        if (interpreted.guests > 0) guests = interpreted.guests;
+        modelTips = [];
+        promptInfo = {
+            text: promptText,
+            kind: interpreted.kind,
+            note: interpreted.note,
+            dishes: interpreted.dishes.map(function (item) { return item.name; })
+        };
+        setMenuText(interpreted.text);
+        modelProvenance = "Built-in planner · " +
+            (interpreted.kind === "mood" ? "mood match" :
+             (interpreted.kind === "dish" ? "dish match" : "seasonal fallback"));
+        modelStatus = interpreted.note + " Sourcing, waste uses and the safety gate are computed locally.";
+        rebuild();
+    }
+
+    function askModelForPrompt() {
+        if (modelBusy) return;
+        if (!backendReady()) {
+            modelStatus = "The module backend is not ready. Open Dhun Commons inside Basecamp to reach OpenRouter.";
+            return;
+        }
+        var request = String(promptText || "").trim();
+        if (!request.length) request = String(menuText || "").trim();
+        if (!request.length) {
+            modelStatus = "Type a dish or mood first.";
+            return;
+        }
+        var dishNames = Kitchen.dishChoices().map(function (item) { return item.name; });
+        var offerNames = Logic.produceOffers(app).slice(0, 20).map(function (offer) {
+            return String(offer.title || offer.ingredientId || offer.id);
+        });
+        modelBusy = true;
+        modelStatus = "Asking OpenRouter to translate the request into kitchen-library dishes. Sourcing, waste uses and the safety gate stay local.";
+        var payload = {
+            messages: Assistant.kitchenMessages(request, guests, month, dishNames, offerNames),
+            maxTokens: 900,
+            temperature: 0.2
+        };
+        logos.watch(host.relayBackend.aiChat(JSON.stringify(payload)), function (value) {
+            page.modelBusy = false;
+            var snapshot = {};
+            try { snapshot = JSON.parse(String(value)); } catch (error) { snapshot = {}; }
+            if (!snapshot.success) {
+                page.modelStatus = snapshot.error || "The model request failed. The built-in planner is still available.";
+                return;
+            }
+            var reply = Kitchen.parseModelReply(snapshot.content || "");
+            if (!reply.ok) {
+                page.modelStatus = reply.error;
+                return;
+            }
+            if (!reply.matched) {
+                page.modelStatus = "The model named dishes that are not in the kitchen library, so the menu was left unchanged. Use Plan it instead, or edit the lines by hand.";
+                return;
+            }
+            var data = Assistant.parseJsonObject(snapshot.content || "");
+            var tips = [];
+            if (data && data.wasteTips && data.wasteTips.length) {
+                for (var i = 0; i < data.wasteTips.length && tips.length < 6; ++i) {
+                    var tip = String(data.wasteTips[i] || "").trim();
+                    if (tip) tips.push(tip);
+                }
+            }
+            page.modelTips = tips;
+            page.setMenuText(Kitchen.modelReplyToText(reply));
+            if (reply.servings > 0) page.guests = reply.servings;
+            page.promptInfo = {
+                text: request,
+                kind: "model",
+                note: "Model-assisted menu · review the lines before filing.",
+                dishes: reply.dishes.map(function (item) { return item.name; })
+            };
+            page.modelProvenance = "OpenRouter · " + String(snapshot.model || "model") + " · review";
+            page.modelStatus = "Reply received in " + Math.max(1, Math.round(Number(snapshot.seconds) || 0)) +
+                " s. Farm sourcing, prices, waste uses and the safety gate are computed by the built-in planner.";
+            page.rebuild();
+        }, function (error) {
+            page.modelBusy = false;
+            page.modelStatus = "The module backend could not reach OpenRouter: " + error;
         });
     }
 
@@ -163,6 +264,12 @@ Item {
             }
             page.setMenuText(Kitchen.modelReplyToText(reply));
             if (reply.servings > 0) page.guests = reply.servings;
+            page.modelTips = [];
+            page.promptInfo = {
+                kind: "photo",
+                note: "Dish names read from the menu photo by " + page.modelName + " on loopback.",
+                dishes: reply.dishes.map(function (item) { return item.name; })
+            };
             page.modelProvenance = "Extracted by " + page.modelName + " on loopback · review the lines and the safety gate.";
             page.modelStatus = "Reply received in " + Math.max(1, Math.round(Number(snapshot.seconds) || 0)) + " s." +
                 (reply.notes.length ? " " + reply.notes.join(" · ") : "");
@@ -392,6 +499,70 @@ Item {
                     padding: 18
                     gap: 9
 
+                    Eyebrow { text: "DISH, MOOD OR ANYTHING" }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 74
+                        radius: 10
+                        color: Theme.white
+                        border.width: 1
+                        border.color: promptArea.activeFocus ? "#A8BE9B" : Theme.line
+
+                        TextArea {
+                            id: promptArea
+                            anchors.fill: parent
+                            anchors.margins: 9
+                            padding: 0
+                            placeholderText: "e.g. I feel cold and tired. Lunch for 20 people, nothing wasted."
+                            placeholderTextColor: Theme.mutedLight
+                            color: Theme.ink
+                            font.family: Theme.uiFont
+                            font.pixelSize: 10
+                            wrapMode: TextEdit.Wrap
+                            background: null
+                            selectByMouse: true
+                            onTextChanged: if (page.promptText !== text) page.promptText = text
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 6
+
+                        ActionButton {
+                            compact: true
+                            variant: "lime"
+                            fontSize: 9
+                            text: "Plan it"
+                            onClicked: page.planFromPrompt()
+                        }
+
+                        ActionButton {
+                            compact: true
+                            variant: "secondary"
+                            fontSize: 9
+                            text: page.modelBusy ? "Asking…" : "Ask OpenRouter"
+                            enabled: !page.modelBusy
+                            onClicked: page.askModelForPrompt()
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Plan it reads the text offline. Ask OpenRouter needs a runtime key and sends only this request."
+                            color: Theme.mutedLight
+                            font.family: Theme.uiFont
+                            font.pixelSize: 7
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 1
+                        color: Theme.lineSoft
+                    }
+
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 8
@@ -428,7 +599,10 @@ Item {
                             wrapMode: TextArea.Wrap
                             background: null
                             selectByMouse: true
-                            onTextChanged: if (page.menuText !== text) page.menuText = text
+                            onTextChanged: if (page.menuText !== text) {
+                                page.menuText = text;
+                                page.promptInfo = null;
+                            }
                         }
                     }
 
@@ -694,6 +868,143 @@ Item {
                     value: page.plan ? String(page.plan.longLifePreserves.length) : "0"
                     caption: "Allowed by the safety gate"
                     accent: Theme.limeDeep
+                }
+            }
+
+            Card {
+                visible: page.plan && page.plan.ok
+                Layout.fillWidth: true
+                padding: 18
+                gap: 12
+
+                RowLayout {
+                    Layout.fillWidth: true
+
+                    Text {
+                        text: "Cook without waste"
+                        color: Theme.ink
+                        font.family: Theme.displayFont
+                        font.pixelSize: 16
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    Pill {
+                        text: page.promptInfo
+                              ? (page.promptInfo.kind === "model" ? "Model-assisted menu" :
+                                 (page.promptInfo.kind === "mood" ? "Built-in mood plan" :
+                                  (page.promptInfo.kind === "dish" ? "Built-in dish plan" : "Built-in seasonal plan")))
+                              : "Built-in plan"
+                        fg: Theme.forest
+                        bg: Theme.sageLight
+                        fontSize: 8
+                    }
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    visible: page.promptInfo && page.promptInfo.note
+                    text: page.promptInfo ? page.promptInfo.note : ""
+                    color: Theme.inkSoft
+                    font.family: Theme.uiFont
+                    font.pixelSize: 8
+                    wrapMode: Text.WordWrap
+                    lineHeight: 1.35
+                }
+
+                Repeater {
+                    model: page.plan && page.plan.ok && page.plan.zeroWaste ? page.plan.zeroWaste : []
+
+                    delegate: RowLayout {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        spacing: 10
+
+                        Rectangle {
+                            width: 20
+                            height: 20
+                            radius: 10
+                            color: Theme.sageLight
+
+                            Icon {
+                                anchors.centerIn: parent
+                                name: "leaf"
+                                color: Theme.forest
+                                width: 10
+                                height: 10
+                            }
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 0
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: modelData.title
+                                color: Theme.ink
+                                font.family: Theme.uiFont
+                                font.pixelSize: 9
+                                font.weight: Font.DemiBold
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: modelData.detail
+                                color: Theme.muted
+                                font.family: Theme.uiFont
+                                font.pixelSize: 8
+                                wrapMode: Text.WordWrap
+                                lineHeight: 1.35
+                            }
+                        }
+                    }
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    visible: page.modelTips.length > 0
+                    spacing: 4
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 1
+                        color: Theme.lineSoft
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: "MODEL TIPS · " + page.modelProvenance
+                        color: Theme.muted
+                        font.family: Theme.uiFont
+                        font.pixelSize: 7
+                        font.letterSpacing: 1.1
+                        font.weight: Font.DemiBold
+                    }
+
+                    Repeater {
+                        model: page.modelTips
+
+                        delegate: Text {
+                            required property string modelData
+                            Layout.fillWidth: true
+                            text: "· " + modelData
+                            color: Theme.inkSoft
+                            font.family: Theme.uiFont
+                            font.pixelSize: 8
+                            wrapMode: Text.WordWrap
+                            lineHeight: 1.35
+                        }
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: "Model tips are advisory. The waste list, pantry gate and safety blockers above are computed locally and are not replaced by the model."
+                        color: Theme.mutedLight
+                        font.family: Theme.uiFont
+                        font.pixelSize: 7
+                        wrapMode: Text.WordWrap
+                    }
                 }
             }
 

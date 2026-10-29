@@ -25,6 +25,9 @@ public:
     QString readPhotoBase64(QString path) override;
     QString probeModelServer(QString endpoint) override;
     QString startMenuPhoto(QString path, QString endpoint, QString model, QString prompt) override;
+    QString aiChat(QString requestJson) override;
+    QString aiStatus() override;
+    QString readTextFile(QString path) override;
 
     void onContextReady() override;
 
@@ -44,6 +47,17 @@ private:
     bool moduleReady() const;
     bool readPhotoBytes(const QString& path, QByteArray* bytes, QString* mime, QString* error) const;
     bool loopbackChatUrl(const QString& endpoint, QString* url, QString* error) const;
+
+    struct AiConfig {
+        QString key;
+        QString model;
+        QString source;
+        QString configPath;
+        QString referer;
+        QString title;
+        bool insecureFile = false;
+    };
+    AiConfig aiConfig() const;
 
     bool m_contextReady = false;
     bool m_walletOpen = false;

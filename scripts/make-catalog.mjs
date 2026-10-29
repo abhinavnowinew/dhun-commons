@@ -18,7 +18,7 @@ import { basename, join, resolve } from "node:path";
 
 const CATALOG_NAME = "dhun-commons";
 const DISPLAY_NAME = "Dhun Commons";
-const DESCRIPTION = "A three-party seasonal treasury and field kitchen for Dhun's landscape: LEZ testnet accounts, stewards who sign up with a name, node-day rewards through a 2-of-3 treasury, farm sourcing, waste-part uses and a guarded long-life pantry.";
+const DESCRIPTION = "A three-party seasonal treasury and field kitchen for Dhun's landscape: LEZ testnet accounts, stewards who sign up with a name, node-day rewards through a 2-of-3 treasury, a whole-wallet assistant, free-text dish or mood planning with zero-waste steps, steward background and capability review, farm sourcing and a guarded long-life pantry.";
 const HOMEPAGE = "https://dhun.life";
 
 function usage() {

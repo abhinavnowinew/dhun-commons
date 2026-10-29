@@ -23,11 +23,21 @@ Maps is optional and activated with a key supplied at runtime; without it the pa
 falls back to a local plan view. Produce markers carry permanent ingredient names.
 See [docs/FIELD-MAP.md](docs/FIELD-MAP.md).
 
-The **Kitchen** tab turns a menu photo and a guest count into a sourcing plan from the
-farm map, a waste-part plan for stalks, leaves, roots and peels, seasonal native
-additions, and a guarded pantry of preserves over 20 days with a guest memorabilia
-label. The planner is deterministic and offline; a free local vision model is optional
-and restricted to loopback. See [docs/KITCHEN.md](docs/KITCHEN.md).
+The **Kitchen** tab turns a menu photo, a typed dish or a mood into a sourcing plan from
+the farm map, a waste-part plan for stalks, leaves, roots and peels, zero-waste cooking
+steps, seasonal native additions, and a guarded pantry of preserves over 20 days with a
+guest memorabilia label. Free text such as "I feel cold and tired, lunch for 20" is read
+by a deterministic mood/season matcher; the planner itself stays offline. A free local
+vision model and an optional OpenRouter model are additive and never replace the local
+safety gate. See [docs/KITCHEN.md](docs/KITCHEN.md).
+
+The **Ask Dhun** assistant sits on top of every section. It reads the same reward rules
+and rehearsal state as the Node & rewards tab, lists concrete DHN actions for today, and
+can answer free-form questions through OpenRouter when a key is configured at runtime.
+The same model path reviews a steward's pasted background or text CV and suggests which
+existing programmes fit; it can only return project ids that are already in the app, and
+an allocation still has to be proposed and signed. See
+[Assistant and OpenRouter](#assistant-and-openrouter).
 
 The **Node & rewards** tab reports the Logos Messaging node and LEZ sequencer exactly as
 they report themselves, records a node day while the messaging node is ready, explains
@@ -58,10 +68,14 @@ A **working demonstration** with two clearly separated layers:
   the app snapshot only: no key material, no signatures, no transfers. See
   [docs/TELEGRAM.md](docs/TELEGRAM.md).
 - **Kitchen planner.** Menu transcription, per-head quantities, farm sourcing, waste
-  uses, native additions, food-safety gating and long-life preserves are deterministic
-  local logic. Market stock, plot estimates and grower names are rehearsal data. No
-  model is installed or bundled; the optional photo reader only calls a loopback
-  OpenAI-compatible endpoint, and no photo leaves the machine.
+  uses, zero-waste steps, native additions, food-safety gating and long-life preserves
+  are deterministic local logic. Market stock, plot estimates and grower names are
+  rehearsal data. No model is installed or bundled; the optional photo reader only calls
+  a loopback OpenAI-compatible endpoint, and no photo leaves the machine.
+- **Assistant and profile review.** The built-in action list and mood matcher are local
+  logic. OpenRouter is called only when a key is supplied at runtime through the
+  environment or a private config file; prompts then leave the device. The key is never
+  written to the repository, QML or the rehearsal state.
 - **DHN treasury rehearsal.** The proposal state machine, allowances, escrow accounting,
   conservation splits, role separation, room transcripts and ledger are real application
   logic running on deterministic local DHN data. Their `txid`s and signatures are demo
@@ -223,6 +237,64 @@ steward wallet and needs two of three signatures. The ledger marks it *treasury 
 not minted*; total supply is unchanged. Payment credits the shared steward wallet, not
 an individual key, because a profile has no key of its own.
 
+## Assistant and OpenRouter
+
+The **Ask Dhun** button opens the same assistant from every section. Two paths sit
+behind it:
+
+- **Built-in guidance (always available, offline).** It reads the reward rules and the
+  local rehearsal state, lists today's grounded actions, and answers common questions
+  about DHN, the kitchen and profiles without calling a model.
+- **OpenRouter (optional, remote).** Free-form questions, model-assisted kitchen menus
+  and profile capability reviews are sent to
+  `https://openrouter.ai/api/v1/chat/completions`. The model defaults to
+  `openai/gpt-4o` and can be changed with `OPENROUTER_MODEL` or the config file.
+
+### Supplying the key
+
+The key is read at runtime by the backend process and is never written to the
+repository, QML, the rehearsal state, a log line or an error message.
+
+The reliable path for a Finder-launched Basecamp is a private config file:
+
+```sh
+mkdir -p ~/.config/dhun-commons
+printf '%s\n' '{"apiKey":"<your OpenRouter key>","model":"openai/gpt-4o"}' \
+  > ~/.config/dhun-commons/openrouter.json
+chmod 600 ~/.config/dhun-commons/openrouter.json
+```
+
+The environment is also read when Basecamp is launched from a shell that exports it:
+
+```sh
+export OPENROUTER_API_KEY="<your OpenRouter key>"
+export OPENROUTER_MODEL="openai/gpt-4o"   # optional
+```
+
+`DHUN_OPENROUTER_CONFIG` points at a different config file. Other optional variables
+are `OPENROUTER_SITE_URL` and `OPENROUTER_SITE_NAME`, sent as the OpenRouter referer
+and title headers. The endpoint is fixed; there is no setting that would send the key
+to another host.
+
+Without a key the assistant and the kitchen's **Plan it** path still work, the kitchen's
+**Ask OpenRouter** button returns an explanatory error, and the profile check does not
+run. Each reply is labelled with its source: built-in guidance, loopback vision model,
+or OpenRouter plus the model id and elapsed time.
+
+### What leaves the device
+
+A remote request carries the conversation, the local context JSON (role, profile name
+and place, rehearsal balances, queued reward count, reward-rule amounts, project titles
+and statuses, open challenge titles) and, for a capability review, the background text
+the person supplied. It does not carry wallet files, seed phrases, private keys, account
+addresses, the Telegram token or the OpenRouter key.
+
+Model output is advisory. It cannot award a programme, execute a payout, change a
+balance or alter the local food-safety gate. Project ids returned by a capability review
+are filtered against the real project list before they appear, and an allocation still
+has to be proposed and signed by two of three parties. Treat the key as a secret: if it
+has been pasted into a chat, issue, or log, rotate it in the OpenRouter dashboard.
+
 ## Telegram relay
 
 
@@ -281,18 +353,19 @@ qml/
   Main.qml            application conductor, state machine and economy
   seed.js             deterministic rehearsal state
   logic.js            proposal, escrow, formatting and covenant logic
-  kitchen.js          menu parser, per-head planner, waste/native data, pantry safety
+  kitchen.js          menu parser, mood matcher, per-head planner, waste/native data, pantry safety
+  assistant.js        reward-action suggestions, grounded context, OpenRouter prompts and parsing
   data.js             landscape zones, seasons, ingredient catalogue and field activities
   theme.js            design tokens
   components/         cards, rows, pills, sheets, fields, guarded WebView host
   pages/              Overview, Field map, Kitchen, Market, Projects, Challenges, Wallet, Room, Landscape
-  drawers/            proposal, purchase, treasury, allocation, project, challenge, about
+  drawers/            proposal, purchase, treasury, allocation, project, challenge, about, profile, assistant
   web/                bundled field studio (Google Maps, activities, clips, procurement)
   assets/produce/     generated produce photography
   assets/menu-sample.jpg  synthetic, illustrative menu photo
 src/
   dhun_commons.rep    universal module interface (slots and properties)
-  dhun_commons_backend.*  LEZ wallet, accounts, balances, transfer and photo-read slots
+  dhun_commons_backend.*  LEZ wallet, accounts, balances, transfer, photo-read and AI slots
   icons/icon.png      module icon
 metadata.json         universal module metadata and lez_core dependency
 CMakeLists.txt        logos_module() build
@@ -300,7 +373,7 @@ scripts/              local studio server and catalog generator/validator
 catalog/              published catalog files, once a release is hosted
 telegram/             Telegram bridge: Bot API long poll, relay files, 8 tests
 docs/                 RFP proposal, field map, kitchen, publishing and demo notes
-tests/Flow.qml        headless 121-check flow harness
+tests/Flow.qml        headless 134-check flow harness
 .github/workflows/    CI: bridge tests, manifest and catalog checks, secret guard
 ```
 
@@ -336,26 +409,23 @@ LGX, attach it to a public release (or static host), generate `logos-repo.json` 
 
 ### Public catalog
 
-The 0.4.3 catalog is live at
+The 0.4.4 catalog is live at
 **https://dhun-commons-atecxfewqi9.qoder.website/logos-repo.json** (public, unsigned).
 Add that URL in Basecamp → Settings → Repositories. The same host serves
-`index.json`, the icon and the 11 MB `.lgx`. The 0.4.3 build adds the native-view
-fix: the field map unloads its web view whenever a drawer, sheet or another Basecamp
-app takes the front, and the embedded studio keeps the procurement dock in its own
-grid row so it cannot sit under the map. The visibility gate reads the host
-window's `visibility`, not `visible`, because Basecamp hosts module QML in a
-`QQuickWidget` whose offscreen window never reports itself visible; a probe against
-Qt 6.9.2 shows `visibility` is Windowed while the widget is shown and Hidden when
-it is hidden. 0.4.3 also fixes the Reconnect toast call and keeps Leaflet sized to
-its container through a ResizeObserver. The **Node &
-rewards** tab, steward profiles and the local vision reply path from 0.4.0 are
-unchanged.
+`index.json`, the icon and the 11 MB `.lgx`. The index lists 0.4.4 only. The 0.4.4
+build adds free-text dish, mood and occasion planning in the Kitchen, a deterministic
+zero-waste cooking list, a whole-wallet assistant that suggests reward-earning work
+from the real rules, and steward background review with advisory capability matching
+filtered to real project ids. OpenRouter chat is available only when a key is supplied
+at runtime; without one the assistant and planner stay local. The native-map and
+Reconnect fixes, Node & rewards, steward profiles and the loopback vision path from
+0.4.0–0.4.3 are included.
 
-Verified on 2026-10-29 with unauthenticated HTTPS requests: the descriptor and index
-returned version 0.4.3, the icon matched its SHA-256, and the downloaded `.lgx` was
-11,092,171 bytes with SHA-256
-`4340e5e383756317d926b6632a24b39771ae115e9311b6948c9ad723e4d6a040` (root hash
-`292b951a425b5f88c7de7bfb87dd01352b3a8df5598f039dbcd5a8b9822abb6e`).
+Verified on 2026-10-30 with unauthenticated HTTPS requests: the descriptor and index
+returned version 0.4.4, the icon matched its SHA-256, and the downloaded `.lgx` was
+11,119,467 bytes with SHA-256
+`0fb24d303716b5b36818a25ab6358e39649186baa6fa6dd30dbfefcdf83e2285` (root hash
+`30804342e2454f3e3f8141fea70e1c078f2f5555fb65659fc0b33eb2e0cd8389`).
 
 This is static catalog hosting only. It does not publish the source repository; the
 working tree still has no git remote.
