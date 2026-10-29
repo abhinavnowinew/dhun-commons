@@ -336,23 +336,26 @@ LGX, attach it to a public release (or static host), generate `logos-repo.json` 
 
 ### Public catalog
 
-The 0.4.2 catalog is live at
+The 0.4.3 catalog is live at
 **https://dhun-commons-atecxfewqi9.qoder.website/logos-repo.json** (public, unsigned).
 Add that URL in Basecamp → Settings → Repositories. The same host serves
-`index.json`, the icon and the 11 MB `.lgx`. The 0.4.2 build adds the native-view
+`index.json`, the icon and the 11 MB `.lgx`. The 0.4.3 build adds the native-view
 fix: the field map unloads its web view whenever a drawer, sheet or another Basecamp
 app takes the front, and the embedded studio keeps the procurement dock in its own
 grid row so it cannot sit under the map. The visibility gate reads the host
 window's `visibility`, not `visible`, because Basecamp hosts module QML in a
-`QQuickWidget` whose offscreen window never reports itself visible. The **Node &
+`QQuickWidget` whose offscreen window never reports itself visible; a probe against
+Qt 6.9.2 shows `visibility` is Windowed while the widget is shown and Hidden when
+it is hidden. 0.4.3 also fixes the Reconnect toast call and keeps Leaflet sized to
+its container through a ResizeObserver. The **Node &
 rewards** tab, steward profiles and the local vision reply path from 0.4.0 are
 unchanged.
 
-Verified on 2026-10-28 with unauthenticated HTTPS requests: the descriptor and index
-returned version 0.4.2, the icon matched its SHA-256, and the downloaded `.lgx` was
-11,092,042 bytes with SHA-256
-`9dab9acb004a0b5c67490cf4090abee47e513cf26e4b47c6e3025a6a7d1ef045` (root hash
-`dac2de7df66d57de04949d59f11212634452df941385f3b679022bf40fdaed95`).
+Verified on 2026-10-29 with unauthenticated HTTPS requests: the descriptor and index
+returned version 0.4.3, the icon matched its SHA-256, and the downloaded `.lgx` was
+11,092,171 bytes with SHA-256
+`4340e5e383756317d926b6632a24b39771ae115e9311b6948c9ad723e4d6a040` (root hash
+`292b951a425b5f88c7de7bfb87dd01352b3a8df5598f039dbcd5a8b9822abb6e`).
 
 This is static catalog hosting only. It does not publish the source repository; the
 working tree still has no git remote.

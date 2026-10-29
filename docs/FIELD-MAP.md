@@ -49,13 +49,16 @@ place anything over it:
   minimised window takes over, the web view is unloaded. Basecamp hosts module QML in a
   `QQuickWidget`, whose offscreen window keeps `visible` false even while on screen —
   it only updates `visibility` (Windowed when shown, Hidden when the widget is hidden),
-  so the gate must not read `visible`. Reading it unloaded the map permanently.
+  so the gate must not read `visible`. Reading it unloaded the map permanently. A probe
+  against Qt 6.9.2 confirms `visibility` is 2 (Windowed) while the widget is shown and 0
+  (Hidden) after `hide()`, with `visible` false throughout.
 - Any QML drawer or sheet — purchase, profile, treasury, proposal, project, challenge,
   about — sets `hostOverlay`, which unloads the web view before the drawer animates in.
   The same applies to the page's native **Mark work** sheet. This is why the purchase
   drawer opened from a produce lot is no longer painted underneath the map.
 - Returning to the page starts a fresh studio session. Viewport, search and open map
-  cards are not preserved across an unload.
+  cards are not preserved across an unload. Leaflet follows container resizes with a
+`ResizeObserver`, so the first WKWebView layout cannot leave a zero-size map.
 
 The bundled studio also marks itself embedded (`body.embedded`) and uses a fixed
 three-row grid — topbar, map, produce dock — so the procurement dock stays on screen

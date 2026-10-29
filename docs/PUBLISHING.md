@@ -15,22 +15,23 @@ This repository follows it exactly: descriptor `schemaVersion` 1, index
 `schemaVersion` 2, `rootHash` copied from `manifest.hashes.root`, and the
 `signature` key omitted for unsigned builds.
 
-> **Status.** The 0.4.2 catalog is published publicly at
+> **Status.** The 0.4.3 catalog is published publicly at
 > **https://dhun-commons-atecxfewqi9.qoder.website/logos-repo.json** and wired
 > into the local Basecamp package downloader at
 > `module_data/package_downloader/3a9e34c93f16/repositories.json`. The descriptor,
 > index, icon and `.lgx` were fetched back over unauthenticated HTTPS; the `.lgx`
-> matched the index SHA-256 exactly (11,092,042 bytes,
-> `9dab9acb004a0b5c67490cf4090abee47e513cf26e4b47c6e3025a6a7d1ef045`, root
-> `dac2de7df66d57de04949d59f11212634452df941385f3b679022bf40fdaed95`). The index
-> lists 0.4.2 only. This build fixes the native map view: the web view unloads when
+> matched the index SHA-256 exactly (11,092,171 bytes,
+> `4340e5e383756317d926b6632a24b39771ae115e9311b6948c9ad723e4d6a040`, root
+> `292b951a425b5f88c7de7bfb87dd01352b3a8df5598f039dbcd5a8b9822abb6e`). The index
+> lists 0.4.3 only. This build fixes the native map view: the web view unloads when
 > any drawer, sheet or other Basecamp app takes the front, and the embedded studio
 > grid keeps the procurement dock out from under the map. 0.4.1 read the host
 > window's `visible` flag, which a QQuickWidget never sets, so the map stayed
-> unloaded; 0.4.2 reads `visibility` (Windowed/Hidden) instead. The 0.4.0 Node &
-> rewards page, steward profiles and local vision reply path are included. The
-> source repository still has no git remote. `dist/public` holds the published
-> files and is gitignored.
+> unloaded; 0.4.2 reads `visibility` (Windowed/Hidden) instead. 0.4.3 fixes the
+> Reconnect toast signal call and resizes Leaflet through a ResizeObserver. The
+> 0.4.0 Node & rewards page, steward profiles and local vision reply path are
+> included. The source repository still has no git remote. `dist/public` holds the
+> published files and is gitignored.
 >
 > Basecamp 0.3.2 shows the catalog URL in **Package Manager → Manage
 > Repositories** with its enabled box ticked, next to the official Logos
@@ -43,7 +44,7 @@ This repository follows it exactly: descriptor `schemaVersion` 1, index
 Edit `metadata.json`:
 
 ```json
-"version": "0.4.2"
+"version": "0.4.3"
 ```
 
 Basecamp 0.2.3 installs a **portable** variant. Do not publish the `-dev`
@@ -59,28 +60,28 @@ NIX_CONFIG="experimental-features = nix-command flakes" nix build .#lgx-portable
 The artifact is a single `.lgx` file under `result/`. Rename it for release:
 
 ```sh
-cp result/logos-dhun_commons-module.lgx dist/dhun_commons-0.4.2.lgx
+cp result/logos-dhun_commons-module.lgx dist/dhun_commons-0.4.3.lgx
 ```
 
 ## 3. Create the GitHub release
 
 Create a public repository for the project (for example
-`OWNER/dhun-commons`) and a release tagged `dhun_commons-v0.4.2`. Attach
-`dhun_commons-0.4.2.lgx` as the release asset.
+`OWNER/dhun-commons`) and a release tagged `dhun_commons-v0.4.3`. Attach
+`dhun_commons-0.4.3.lgx` as the release asset.
 
 The asset URL becomes:
 
 ```text
-https://github.com/OWNER/dhun-commons/releases/download/dhun_commons-v0.4.2/dhun_commons-0.4.2.lgx
+https://github.com/OWNER/dhun-commons/releases/download/dhun_commons-v0.4.3/dhun_commons-0.4.3.lgx
 ```
 
 ## 4. Generate the catalog
 
 ```sh
 node scripts/make-catalog.mjs \
-  --lgx dist/dhun_commons-0.4.2.lgx \
+  --lgx dist/dhun_commons-0.4.3.lgx \
   --github OWNER/dhun-commons \
-  --release-tag dhun_commons-v0.4.2 \
+  --release-tag dhun_commons-v0.4.3 \
   --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   --out catalog
 ```
@@ -98,8 +99,8 @@ descriptor and index. Override them for GitHub Pages or another host:
 
 ```sh
 node scripts/make-catalog.mjs \
-  --lgx dist/dhun_commons-0.4.2.lgx \
-  --url https://cdn.example.org/dhun/dhun_commons-0.4.2.lgx \
+  --lgx dist/dhun_commons-0.4.3.lgx \
+  --url https://cdn.example.org/dhun/dhun_commons-0.4.3.lgx \
   --index-url https://cdn.example.org/dhun/index.json \
   --out catalog
 ```
@@ -116,7 +117,7 @@ same `rootHash` are replaced, so a rebuild is idempotent.
 ```sh
 node scripts/make-catalog.mjs --check catalog
 git add catalog/index.json catalog/logos-repo.json catalog/icons
-git commit -m "Publish Dhun Commons 0.4.2 catalog"
+git commit -m "Publish Dhun Commons 0.4.3 catalog"
 git push origin main
 ```
 

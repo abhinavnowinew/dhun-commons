@@ -2131,6 +2131,14 @@
         addZoomButtons();
         renderMarkers();
         window.setTimeout(function () { if (app.leaflet) app.leaflet.invalidateSize(); }, 0);
+        // The WKWebView host can lay the grid out after the first tick, so keep
+        // Leaflet matched to the container instead of trusting one timeout.
+        if (window.ResizeObserver && !app.mapResizeObserver) {
+            app.mapResizeObserver = new ResizeObserver(function () {
+                if (app.leaflet) app.leaflet.invalidateSize();
+            });
+            app.mapResizeObserver.observe(dom.map);
+        }
         return true;
     }
 

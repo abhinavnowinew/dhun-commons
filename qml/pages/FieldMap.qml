@@ -228,7 +228,7 @@ Item {
             return;
         }
         studioWebView.loadUrl(studioAddress());
-        toast("Reconnecting the field studio\u2026");
+        toast("Reconnecting the field studio\u2026", "ok");
     }
 
     function switchSource() {
