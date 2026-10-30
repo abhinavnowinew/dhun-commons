@@ -440,19 +440,27 @@ the relay's commands, files and token boundary.
 
 ## Publishing this repository
 
-The working tree is a normal git repository with one initial commit; no remote is
-configured. To publish it under your account:
+The working tree is a normal git repository with no remote configured; the 0.5.1
+release is committed on `main`. To publish it under your account:
+
+1. Create an empty repository (**Dhun Commons**, name `dhun-commons`, private is
+   recommended) at github.com/new. Do not let GitHub add a README, `.gitignore` or
+   licence; this tree already has them.
+2. Point the local repo at it and push:
 
 ```sh
-git remote add origin git@github.com:<you>/dhun-commons.git
+git remote add origin https://github.com/<you>/dhun-commons.git
 git push -u origin main
 ```
 
-or, with the GitHub CLI:
+HTTPS asks for your GitHub username and a personal access token; an SSH key is not
+set up on this machine (only `known_hosts` exists). The GitHub CLI is not installed
+either; if you install it, `gh repo create dhun-commons --private --source .
+--remote origin --push` does both steps.
 
-```sh
-gh repo create dhun-commons --private --source . --remote origin --push
-```
+Never add `.env`, the OpenRouter key, Signal account or group identifiers, or the
+Maps key. `.gitignore` excludes env files and CI runs a secret guard, but check
+`git status` before the first push anyway.
 
 Basecamp apps are discovered through a module **catalog**, not a central store. The
 catalog generator and validator are in `scripts/make-catalog.mjs`; the full release
