@@ -23,6 +23,27 @@ Maps is optional and activated with a key supplied at runtime; without it the pa
 falls back to a local plan view. Produce markers carry permanent ingredient names.
 See [docs/FIELD-MAP.md](docs/FIELD-MAP.md).
 
+The **Agro & conservation** tab reads the Open-Meteo forecast for the five field zones
+through the backend, applies deterministic agronomy rules (rain, heat, cold, wind,
+fungal pressure, topsoil moisture, ET0, UV) and a separate conservation lens (runoff
+and erosion, the rain-versus-ET0 water budget, bare-soil cover, native planting and
+seed windows, fire weather, wildlife water). Ventusky has no public API, so the tab
+links live atlas layers and a satellite plot instead of embedding them. Every item is
+advisory only: no rule moves DHN, edits field state or proposes a treasury action.
+See [docs/AGRO.md](docs/AGRO.md).
+
+The **Civic simulation** tab gives eight residents a steward agent and runs a
+seven-day, day-by-day board across water, roads, agri, safety, waste and care.
+Agents triage synthetic reports, draft and chase the coordination work, collect
+evidence and escalate only money, permits, safety-critical calls, rights and
+repeated evidence gaps. They also work as a crew: consulting the domain lead,
+pairing on hard jobs, handing work to an idle teammate and peer-checking each
+other's evidence. You sign or decline in an inbox that batches extra asks so no one
+is interrupted eight times. A disclosed fairness facilitator audits which zone
+received the day's actions, and each night agents file reflections citing only the
+issues they witnessed or worked on with a peer. The engine is deterministic for a seed, makes no model
+calls and contacts nobody. See [docs/CIVIC.md](docs/CIVIC.md).
+
 The **Kitchen** tab turns a meal request into a reviewed menu, guest-scaled sourcing plan,
 itemized estimated cost and per-person cost, waste-use plan, and guarded pantry routes.
 Ollama can suggest dishes from the app's library using local inference only; quantities,
@@ -67,6 +88,16 @@ A **working demonstration** with two clearly separated layers:
   transfer changes, and queues `/say` messages into the room. It reads public data and
   the app snapshot only: no key material, no signatures, no transfers. See
   [docs/TELEGRAM.md](docs/TELEGRAM.md).
+- **Signal relay (optional).** The same relay engine, driven by `signal-cli` as a linked
+  device: a Signal group can ask the app questions and get answers after the assistant
+  model replies. Answers are queued through files in the shared relay directory; the
+  bridge reads the app snapshot only. See [docs/SIGNAL.md](docs/SIGNAL.md).
+- **Xenia inference router (optional).** When the `inference` core module is installed,
+  its identity is unlocked and a provider is live, Ask Dhun routes prompts through
+  [Xenia](https://github.com/hackyguru/xenia): sealed prompts over Logos delivery, a
+  headless `logoscore` provider running local Ollama, answers matched by prompt id. The
+  identity is created or unlocked from the assistant panel; the seed phrase is shown
+  once and never stored by Dhun. See [docs/XENIA.md](docs/XENIA.md).
 - **Kitchen planner.** Local Ollama suggests allowed dishes; menu parsing, guest-scaled
   quantities, farm sourcing, itemized estimates, per-person totals, waste uses, native
   additions and food-safety gating are deterministic local logic. Market stock and
@@ -77,6 +108,20 @@ A **working demonstration** with two clearly separated layers:
   context stay on this device. OpenRouter is used only when no local server responds and
   a key is supplied at runtime through the environment or a private config file; prompts
   then leave the device. The key is never written to the repository, QML or rehearsal state.
+- **Agro and conservation advisory.** A backend slot fetches Open-Meteo current and
+  daily values (one request per zone, cached 30 minutes) and the QML applies local
+  rules for agronomy and conservation. Ventusky opens as live atlas links because it
+  has no public data API. The advisory never acts on the treasury or field data.
+  See [docs/AGRO.md](docs/AGRO.md).
+- **Civic simulation.** A deterministic local engine, not a model. Eight resident
+  agents run a six-phase civic day over 24 synthetic report templates, spend a
+  4,800 DHN simulated envelope, and stop at human gates for treasury, permits,
+  safety-critical work and evidence gaps. Agents consult domain leads, pair on
+  hard jobs, hand tasks to idle teammates and peer-check evidence; the page shows
+  the crew links behind those counts. Per-person ask caps batch interruptions, a
+  facilitator rebalances lopsided days, and nightly reflections cite only
+  witnessed issues and name collaborators. No network, no real departments, no
+  persistence yet. See [docs/CIVIC.md](docs/CIVIC.md).
 - **DHN treasury rehearsal.** The proposal state machine, allowances, escrow accounting,
   conservation splits, role separation, room transcripts and ledger are real application
   logic running on deterministic local DHN data. Their `txid`s and signatures are demo
@@ -363,7 +408,7 @@ qml/
   data.js             landscape zones, seasons, ingredient catalogue and field activities
   theme.js            design tokens
   components/         cards, rows, pills, sheets, fields, guarded WebView host
-  pages/              Overview, Field map, Kitchen, Market, Projects, Challenges, Wallet, Room, Landscape
+  pages/              Overview, Field map, Agro, Civic, Kitchen, Market, Projects, Challenges, Wallet, Room, Landscape
   drawers/            proposal, purchase, treasury, allocation, project, challenge, about, profile, assistant
   web/                bundled field studio (Google Maps, activities, clips, procurement)
   assets/produce/     generated produce photography
@@ -377,8 +422,9 @@ CMakeLists.txt        logos_module() build
 scripts/              local studio server and catalog generator/validator
 catalog/              published catalog files, once a release is hosted
 telegram/             Telegram bridge: Bot API long poll, relay files, 8 tests
+signal/               Signal bridge: signal-cli JSON-RPC, relay files, 11 tests
 docs/                 RFP proposal, field map, kitchen, publishing and demo notes
-tests/Flow.qml        headless 134-check flow harness
+tests/Flow.qml        headless 184-check flow harness
 .github/workflows/    CI: bridge tests, manifest and catalog checks, secret guard
 ```
 
@@ -387,7 +433,9 @@ The packaged studio lives at `qml/web/` because the LGX includes `qml/`.
 See [docs/DEMO.md](docs/DEMO.md) for the full walkthrough, expected numbers and the
 list of simulated behaviour, [docs/FIELD-MAP.md](docs/FIELD-MAP.md) for Maps key
 setup, data limits and the camera caveat, [docs/KITCHEN.md](docs/KITCHEN.md) for the
-kitchen planner and local model setup, and [docs/TELEGRAM.md](docs/TELEGRAM.md) for
+kitchen planner and local model setup, [docs/AGRO.md](docs/AGRO.md) for the forecast,
+Ventusky and advisory rules, [docs/CIVIC.md](docs/CIVIC.md) for the eight-agent civic
+simulation, gates and limits, and [docs/TELEGRAM.md](docs/TELEGRAM.md) for
 the relay's commands, files and token boundary.
 
 ## Publishing this repository

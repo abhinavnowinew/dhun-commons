@@ -79,7 +79,7 @@ SideSheet {
             return;
         }
         assessBusy = true;
-        assessStatus = "Sending the background to OpenRouter. Nothing else from this device is included.";
+        assessStatus = "Sending the background to the assistant model. Nothing else from this device is included.";
         var payload = {
             messages: Assistant.profileMessages(activePerson, text, app && app.projects ? app.projects : []),
             maxTokens: 600,

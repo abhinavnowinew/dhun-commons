@@ -405,11 +405,12 @@ and field records stay local.
 
 ## Automated checks
 
-The in-repo flow harness exercises 134 assertions across all proposal kinds, roles,
+The in-repo flow harness exercises 184 assertions across all proposal kinds, roles,
 escrows, covenants, supply conservation, the native field page, field orders, the
 studio bridge events, the Telegram relay queue, the kitchen planner, free-text mood
 planning, zero-waste routes, the whole-wallet assistant, profile capability filtering,
-node-day rewards, steward signup and reward payouts:
+node-day rewards, steward signup, reward payouts, the agro conservation rules and the
+civic simulation engine:
 
 ```sh
 export QML2_IMPORT_PATH=/Applications/LogosBasecamp.app/Contents/Resources/qt/qml
@@ -424,7 +425,7 @@ export QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software
 Expected final line:
 
 ```text
-qml: SUMMARY checks=134 failures=0 supply=170000 issued=170000
+qml: SUMMARY checks=184 failures=0 supply=170000 issued=170000
 ```
 
 The 170,000 supply is correct: the harness executes the 20,000 DHN Tranche C mint,
@@ -510,8 +511,14 @@ satellite studio is therefore checked live in Basecamp, not by this harness.
 | `src/dhun_commons_backend.{h,cpp}` | LEZ wallet, balances, transfers, local photo reader, runtime OpenRouter client and text-file reader |
 | `metadata.json`, `CMakeLists.txt` | Universal module metadata, `lez_core` dependency and build |
 | `scripts/make-catalog.mjs` | Generates and validates the public Basecamp catalog files |
-| `tests/Flow.qml` | 134-check headless flow harness |
+| `tests/Flow.qml` | 184-check headless flow harness |
+| `qml/agro.js` | Pure agronomy and conservation rules plus Ventusky link builders |
+| `qml/pages/Agro.qml` | Forecast page: current readings, advisories, seven-day table and atlas links |
+| `qml/civic.js` | Deterministic eight-agent civic simulation: personas, domains, reports, gates, metrics |
+| `qml/pages/Civic.qml` | Civic page: day clock, inbox, agent roster, domain queues, feed and reflections |
 | `docs/FIELD-MAP.md` | Maps key setup, studio architecture, data limits and camera caveat |
 | `docs/KITCHEN.md` | Kitchen workflow, free local vision models, safety rules and limits |
+| `docs/AGRO.md` | Open-Meteo slot, advisory thresholds, Ventusky links and limits |
+| `docs/CIVIC.md` | Civic simulation loop, personas, human gates, fairness and honesty limits |
 | `docs/PUBLISHING.md` | Catalog schema, release hosting and Basecamp repository setup |
 | `docs/RFP-005-proposal.md` | Production design and RFP submission draft |

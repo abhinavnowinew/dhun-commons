@@ -18,10 +18,10 @@ function ageLabel(ms) {
   return `${Math.round(hours / 24)}d ago`;
 }
 
-function displayName(from) {
-  if (!from) return "Telegram";
+function displayName(from, fallback = "Telegram") {
+  if (!from) return fallback;
   const name = [from.first_name, from.last_name].filter(Boolean).join(" ").trim();
-  return name || from.username || String(from.id ?? "Telegram");
+  return name || from.username || String(from.id ?? fallback);
 }
 
 function cleanError(message) {
@@ -53,6 +53,8 @@ export function createEngine(config, deps) {
   const relay = deps.relay;
   const clock = deps.now ?? Date.now;
   const startedAt = clock();
+  const channel = config.channelName ?? "Telegram";
+  const accessEnv = config.accessEnv ?? "TELEGRAM_ALLOWED_CHAT_IDS";
   let botName = "";
   let lastHeight = null;
   let lastTxKey = "";
@@ -66,7 +68,7 @@ export function createEngine(config, deps) {
     return [
       "This relay is not bound to this chat.",
       `Chat id: ${chatId}`,
-      "Add it to TELEGRAM_ALLOWED_CHAT_IDS and restart the bridge.",
+      `Add it to ${accessEnv} and restart the bridge.`,
     ].join("\n");
   }
 
@@ -273,10 +275,10 @@ export function createEngine(config, deps) {
             text: value,
             at: clock(),
             chatId: String(chatId),
-            author: displayName(message.from),
+            author: displayName(message.from, channel),
           });
           return [
-            "Queued for the app. Open Rooms → Telegram relay and press Post to add it to the room. Nothing is signed.",
+            `Queued for the app. Open Rooms → ${channel} relay and press Post to add it to the room. Nothing is signed.`,
           ];
         }
         case "/update": {
@@ -356,6 +358,7 @@ export function createEngine(config, deps) {
   return {
     handleUpdate,
     tick,
+    unauthorized,
     setBot(name) {
       botName = String(name || "");
     },

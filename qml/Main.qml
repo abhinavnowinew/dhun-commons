@@ -7,6 +7,7 @@ import "theme.js" as Theme
 import "logic.js" as Logic
 import "seed.js" as Seed
 import "rewards.js" as Rewards
+import "assistant.js" as Assistant
 import "components"
 import "pages"
 import "drawers"
@@ -58,6 +59,10 @@ Item {
     property string relayNotice: ""
     property var relaySeen: ({})
 
+    property bool signalBusy: false
+    property var signalSeen: ({})
+    property var signalBridge: ({})
+
     property string toastText: ""
     property string toastTone: "ok"
 
@@ -68,7 +73,7 @@ Item {
     readonly property int pendingRewardCount: state ? Rewards.pendingCount(state) : 0
     readonly property var catalog: state && state.catalog ? state.catalog : null
 
-    readonly property var pageOrder: ["overview", "field", "kitchen", "market", "projects", "challenges", "wallet", "node", "room", "landscape", "case"]
+    readonly property var pageOrder: ["overview", "field", "agro", "civic", "kitchen", "market", "projects", "challenges", "wallet", "node", "room", "landscape", "case"]
     readonly property var pageMeta: ({
         overview: {
             title: "Overview",
@@ -79,6 +84,16 @@ Item {
             title: "Field map",
             subtitle: "Produce plots, field work and the calendar the three parties share",
             section: "Field"
+        },
+        agro: {
+            title: "Agro & conservation",
+            subtitle: "Open-Meteo forecast, Ventusky atlas and rule-based agronomy and conservation guidance",
+            section: "Field"
+        },
+        civic: {
+            title: "Civic simulation",
+            subtitle: "Eight residents' agents carry water, roads, agri, safety, waste and care work while you only sign",
+            section: "Civic"
         },
         kitchen: {
             title: "Kitchen",
@@ -211,6 +226,16 @@ Item {
         repeat: true
         running: app.relayReady
         onTriggered: app.pollRelayInbox()
+    }
+
+    // Signal questions are queued by the bridge in the same relay folder. The
+    // app answers them through the assistant, then writes answers.json back.
+    Timer {
+        id: signalPollTimer
+        interval: 6000
+        repeat: true
+        running: app.relayReady
+        onTriggered: app.pollSignalAsks()
     }
 
     // A node day is only recorded while the Logos Messaging node reports
@@ -1600,6 +1625,55 @@ Item {
         }, function (error) {});
     }
 
+    function pollSignalAsks() {
+        if (!relayBackend || !relayReady || signalBusy) return;
+        logos.watch(relayBackend.signalRelay(), function (value) {
+            var parsed = app.relayParse(value);
+            if (!parsed || !parsed.success) return;
+            app.signalBridge = parsed.bridge && typeof parsed.bridge === "object" ? parsed.bridge : ({});
+            var list = Array.isArray(parsed.asks) ? parsed.asks : [];
+            for (var i = 0; i < list.length; ++i) {
+                var id = String(list[i].id || "");
+                if (!id.length || app.signalSeen[id]) continue;
+                app.signalSeen[id] = true;
+                app.answerSignalAsk(list[i]);
+                break;
+            }
+        }, function (error) {});
+    }
+
+    function answerSignalAsk(ask) {
+        var id = String(ask && ask.id ? ask.id : "");
+        var text = String(ask && ask.text ? ask.text : "").trim();
+        if (!id.length || !text.length) return;
+        signalBusy = true;
+        var payload = {
+            messages: Assistant.chatMessages(app, [], text),
+            maxTokens: 500,
+            temperature: 0.2
+        };
+        logos.watch(relayBackend.aiChat(JSON.stringify(payload)), function (value) {
+            var snapshot = app.relayParse(value);
+            var reply = snapshot && snapshot.success && snapshot.content
+                ? String(snapshot.content)
+                : Assistant.localAnswer(app, text);
+            app.publishSignalReply(id, reply);
+        }, function (error) {
+            app.publishSignalReply(id, Assistant.localAnswer(app, text));
+        });
+    }
+
+    function publishSignalReply(id, reply) {
+        logos.watch(relayBackend.publishSignalAnswer(String(id), String(reply)), function (value) {
+            app.signalBusy = false;
+            var parsed = app.relayParse(value);
+            if (parsed && parsed.success)
+                app.showToast("Signal answer queued");
+        }, function (error) {
+            app.signalBusy = false;
+        });
+    }
+
     function relayAck(id) {
         var key = String(id || "");
         var next = [];
@@ -1749,12 +1823,22 @@ Item {
                     onToast: function (text, tone) { app.showToast(text, tone) }
                 }
 
+                Agro {
+                    host: app
+                    app: app.state
+                    now: app.now
+                    activeRole: app.activeRole
+                }
+
+                Civic {
+                    app: app.state
+                    now: app.now
+                }
+
                 Kitchen {
                     host: app
                     app: app.state
-                }
-
-                Market {
+                }                Market {
                     app: app.state
                     now: app.now
                     activeRole: app.activeRole

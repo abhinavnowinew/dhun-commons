@@ -72,6 +72,19 @@ jobs:
           test -f tests/Flow.qml
           test -f docs/KITCHEN.md
           test -f docs/PUBLISHING.md
+          test -f qml/agro.js
+          test -f qml/pages/Agro.qml
+          test -f docs/AGRO.md
+          grep -q 'agroForecast' src/dhun_commons.rep
+          grep -q 'agroForecast' src/dhun_commons_backend.cpp
+          grep -q '"agro"' qml/Main.qml
+          test -f qml/civic.js
+          test -f qml/pages/Civic.qml
+          test -f docs/CIVIC.md
+          grep -q '"civic"' qml/Main.qml
+          grep -q 'civic' qml/components/Sidebar.qml
+          grep -q 'function balanceLoads' qml/civic.js
+          grep -q 'CREW INTERPLAY' qml/pages/Civic.qml
 
   catalog:
     name: Catalog generator

@@ -1,0 +1,18 @@
+{
+  "name": "dhun-signal-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Signal relay for Dhun Commons in Logos Basecamp",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node bridge.mjs",
+    "check": "node bridge.mjs --check",
+    "link": "node link.mjs",
+    "groups": "node groups.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "license": "UNLICENSED"
+}

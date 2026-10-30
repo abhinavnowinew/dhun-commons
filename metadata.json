@@ -1,22 +1,26 @@
 {
   "name": "dhun_commons",
   "display_name": "Dhun Commons",
-  "version": "0.4.6",
+  "version": "0.5.1",
   "type": "ui_qml",
   "interface": "universal",
   "category": "community",
-  "description": "A three-party seasonal treasury and field kitchen for Dhun's landscape: private multisig proposals, DHN rewards for node uptime and field work, steward profiles with background and capability review, a whole-wallet assistant that suggests reward-earning work, local-only Ollama menu suggestions with guest-scaled sourcing and cost estimates, zero-waste steps, farm sourcing and a guarded long-life pantry, with live LEZ testnet accounts. Kitchen inference never falls back to a remote provider.",
+  "description": "A three-party seasonal treasury and field kitchen for Dhun's landscape: private multisig proposals, DHN rewards for node uptime and field work, steward profiles with background and capability review, a whole-wallet assistant that answers in the app and on Signal, routing prompts through Xenia inference over Logos delivery, with local-only Ollama menu suggestions, guest-scaled sourcing and cost estimates, zero-waste steps, farm sourcing and a guarded long-life pantry, an Open-Meteo and Ventusky agronomy and conservation advisory for the five field zones, a deterministic eight-agent civic simulation that carries water, roads, agri, safety, waste and care work behind human gates, where the agents consult, pair, hand off and peer-check each other, and live LEZ testnet accounts. Kitchen inference never falls back to a remote provider.",
   "author": "Dhun Commons",
   "main": "dhun_commons_plugin",
   "view": "qml/Main.qml",
   "icon": "src/icons/icon.png",
   "dependencies": [
     "lez_core",
-    "chat_module"
+    "chat_module",
+    "inference"
   ],
   "dependency_overrides": {
     "chat_module": {
       "file": "interfaces/chat_module.lidl"
+    },
+    "inference": {
+      "file": "interfaces/inference.lidl"
     }
   },
   "codegen": {

@@ -2,6 +2,8 @@ import QtQuick
 import QtQuick.Window
 import "../qml/kitchen.js" as Kitchen
 import "../qml/assistant.js" as Assistant
+import "../qml/agro.js" as Agro
+import "../qml/civic.js" as Civic
 
 Window {
     id: win
@@ -206,6 +208,276 @@ Window {
         check("escape closes drawer", app.activeProject === null);
         app.navigate("landscape");
         check("landscape navigable", app.activePage === "landscape");
+
+        // 11b. Agro and conservation advisory
+        app.navigate("agro");
+        check("agro tab is registered", app.pageOrder.indexOf("agro") !== -1 && app.activePage === "agro", app.activePage);
+        check("agro tab has page metadata",
+              app.pageMeta.agro && app.pageMeta.agro.section === "Field" && app.pageMeta.agro.title.length > 4,
+              app.pageMeta.agro ? app.pageMeta.agro.title : "missing");
+        var orchard = Agro.locationById("orchard");
+        check("agro knows the orchard zone", orchard.id === "orchard" && orchard.latitude > 26, orchard.id);
+        check("agro builds a Ventusky atlas url",
+              Agro.webUrl("farms", "rain-3h").indexOf("ventusky.com/?p=26.7088;75.5868;11&l=rain-3h") !== -1,
+              Agro.webUrl("farms", "rain-3h"));
+        var stormDay = { date: "2026-07-02", code: 95, tMax: 43, tMin: 4, rain: 60, chance: 90, wind: 22, gust: 70,
+                         rh: 90, soil: 0.36, et0: 7, uv: 10, dew: 26 };
+        var stormItems = Agro.dayAdvisories(stormDay);
+        var stormTitles = stormItems.map(function (item) { return item.title; }).join(" | ");
+        check("agro flags heavy rain and heat",
+              stormItems.some(function (item) { return item.tone === "red" && item.title.indexOf("Heavy rain") !== -1; }),
+              stormTitles);
+        check("agro caps today's agronomy cards at six", stormItems.length <= 6, stormItems.length);
+        var calmDay = { date: "2026-02-10", code: 2, tMax: 27, tMin: 12, rain: 0, chance: 5, wind: 8, gust: 12,
+                        rh: 55, soil: 0.2, et0: 3, uv: 5, dew: 12 };
+        check("agro returns a workable-day fallback",
+              Agro.dayAdvisories(calmDay)[0].title === "Workable field day",
+              Agro.dayAdvisories(calmDay)[0].title);
+        var wetWeek = [
+            { date: "2026-07-02", rain: 30, et0: 4, rh: 90, gust: 20, tMax: 30, tMin: 25, soil: 0.36 },
+            { date: "2026-07-03", rain: 18, et0: 4, rh: 88, gust: 20, tMax: 30, tMin: 25, soil: 0.34 }
+        ];
+        var wetItems = Agro.conservationAdvisories(wetWeek, { soil: 0.36 });
+        var wetTitles = wetItems.map(function (item) { return item.title; }).join(" | ");
+        check("agro flags runoff in a wet 72 h", wetTitles.indexOf("Runoff watch") !== -1, wetTitles);
+        check("agro reports a surplus water budget", wetTitles.indexOf("Surplus water") !== -1, wetTitles);
+        check("agro keeps advisory-only copy in view", Agro.LIMIT_NOTE.indexOf("Advisory only") === 0, Agro.LIMIT_NOTE);
+        var dryWeek = [
+            { date: "2026-05-20", rain: 0, et0: 10, rh: 20, gust: 40, tMax: 41, tMin: 29, soil: 0.05 },
+            { date: "2026-05-21", rain: 0, et0: 10, rh: 20, gust: 38, tMax: 42, tMin: 30, soil: 0.05 }
+        ];
+        var dryItems = Agro.conservationAdvisories(dryWeek, { soil: 0.05 });
+        var dryTitles = dryItems.map(function (item) { return item.title; }).join(" | ");
+        check("agro flags fire weather and wildlife water",
+              dryTitles.indexOf("Fire weather") !== -1 && dryTitles.indexOf("Wildlife water stress") !== -1,
+              dryTitles);
+        check("agro notices the irrigation deficit", dryTitles.indexOf("Irrigation deficit") !== -1, dryTitles);
+        var windowDays = [
+            { date: "2026-06-15", rain: 0, wind: 10, tMax: 28, tMin: 18, rh: 60, gust: 18, chance: 10 },
+            { date: "2026-06-16", rain: 12, wind: 12, tMax: 29, tMin: 20, rh: 70, gust: 22, chance: 80 }
+        ];
+        var windows = Agro.windowsFor(windowDays);
+        check("agro marks sow, spray, harvest and hold windows",
+              windows.sow.length === 1 && windows.spray.length === 1 &&
+              windows.harvest.length === 1 && windows.hold.length === 1,
+              JSON.stringify(windows));
+        var drySummary = Agro.summarise(dryWeek);
+        check("agro summarises the dry week",
+              drySummary.rainWeek === 0 && drySummary.maxTemp === 42 && drySummary.dryDays === 2,
+              JSON.stringify(drySummary));
+        check("agro maps a backend payload",
+              Agro.mapForecast({ success: true, days: [{ date: "2026-10-30", tMax: 31, soil: 0.21 }], current: { temp: 29 } }).success === true);
+        check("agro rejects a failed payload",
+              Agro.mapForecast({ success: false, error: "nope" }).success === false);
+        app.navigate("overview");
+
+        // 11b. Civic simulation
+        check("civic registers six domains and eight personas",
+              Civic.DOMAINS.length === 6 && Civic.PERSONAS.length === 8);
+        var civicCauseIds = [];
+        for (var cc = 0; cc < Civic.DOMAINS.length; ++cc) civicCauseIds.push(Civic.DOMAINS[cc].id);
+        check("civic covers water, roads, agri and safety",
+              civicCauseIds.indexOf("water") !== -1 && civicCauseIds.indexOf("roads") !== -1 &&
+              civicCauseIds.indexOf("agri") !== -1 && civicCauseIds.indexOf("safety") !== -1,
+              civicCauseIds.join(","));
+
+        var civicRun = Civic.create(77, 10);
+        Civic.advance(civicRun);
+        check("civic opens reports at dawn",
+              civicRun.issues.length >= 2 && civicRun.issues[0].status === "backlog",
+              civicRun.issues.length);
+        Civic.advance(civicRun);
+        var civicCapable = true;
+        var civicUnattended = 0;
+        var civicLoads = {};
+        for (var ci = 0; ci < civicRun.issues.length; ++ci) {
+            var civicIssue = civicRun.issues[ci];
+            if (!civicIssue.owner) { civicUnattended += 1; continue; }
+            var civicPersona = Civic.personaById(civicIssue.owner);
+            if (!civicPersona || civicPersona.capability[civicIssue.domain] < 2) civicCapable = false;
+            if (civicIssue.status === "assigned" || civicIssue.status === "actioned" || civicIssue.status === "awaiting")
+                civicLoads[civicIssue.owner] = (civicLoads[civicIssue.owner] || 0) + 1;
+        }
+        check("civic assigns only capable agents", civicCapable);
+        var civicLoadOk = true;
+        for (var civicOwner in civicLoads) if (civicLoads[civicOwner] > 2) civicLoadOk = false;
+        check("civic caps each agent at two active tasks", civicLoadOk, JSON.stringify(civicLoads));
+
+        var civicGuard = 0;
+        while (!civicRun.done && civicRun.escalations.length === 0 && civicGuard < 24) {
+            Civic.advance(civicRun);
+            civicGuard += 1;
+        }
+        check("civic escalates high-risk work to a human", civicRun.escalations.length > 0, civicGuard);
+
+        var civicSign = Civic.create(5, 10);
+        civicSign.dayStats[1] = { opened: 1, closed: 0, actions: 0, asks: 0, humanMinutes: 0, zoneActions: {}, domainActions: {}, assigned: {}, reopened: 0 };
+        var civicWell = Civic.addIssue(civicSign, "s-well");
+        civicWell.status = "assigned";
+        civicWell.owner = "kabir";
+        var civicAsk = Civic.escalate(civicSign, civicWell, "safety-critical");
+        var civicSpentBefore = civicSign.budget.spent;
+        Civic.sign(civicSign, civicAsk.id);
+        check("civic signing clears the ask and commits budget",
+              civicAsk.status === "signed" && civicWell.status === "actioned" &&
+              civicSign.budget.spent === civicSpentBefore + civicWell.cost,
+              civicAsk.status + " " + civicWell.status + " " + civicSign.budget.spent);
+
+        var civicDecline = Civic.create(6, 10);
+        civicDecline.dayStats[1] = { opened: 1, closed: 0, actions: 0, asks: 0, humanMinutes: 0, zoneActions: {}, domainActions: {}, assigned: {}, reopened: 0 };
+        var civicLane = Civic.addIssue(civicDecline, "r-school");
+        civicLane.status = "assigned";
+        civicLane.owner = "arjun";
+        var civicPermit = Civic.escalate(civicDecline, civicLane, "permit");
+        Civic.decline(civicDecline, civicPermit.id);
+        check("civic declining returns work to the backlog",
+              civicPermit.status === "declined" && civicLane.status === "backlog" && civicLane.declines === 1,
+              civicPermit.status + " " + civicLane.status);
+
+        var civicBatch = Civic.create(7, 10);
+        civicBatch.dayStats[1] = { opened: 3, closed: 0, actions: 0, asks: 0, humanMinutes: 0, zoneActions: {}, domainActions: {}, assigned: {}, reopened: 0 };
+        var civicBatchTemplates = ["s-well", "s-snake", "s-night"];
+        var civicBatchAsks = [];
+        for (var cb = 0; cb < civicBatchTemplates.length; ++cb) {
+            var civicRisk = Civic.addIssue(civicBatch, civicBatchTemplates[cb]);
+            civicRisk.status = "assigned";
+            civicRisk.owner = "kabir";
+            civicBatchAsks.push(Civic.escalate(civicBatch, civicRisk, "safety-critical"));
+        }
+        var civicBatched = 0;
+        for (var cba = 0; cba < civicBatchAsks.length; ++cba) if (civicBatchAsks[cba].status === "batched") civicBatched += 1;
+        check("civic batches extra asks for one human", civicBatched >= 1, civicBatched);
+
+        var civicFair = Civic.create(8, 10);
+        civicFair.dayStats[1] = { opened: 2, closed: 0, actions: 6, asks: 0, humanMinutes: 0, zoneActions: { farms: 6 }, domainActions: { water: 6 }, assigned: {}, reopened: 0 };
+        var civicOrch1 = Civic.addIssue(civicFair, "a-drip");
+        civicOrch1.status = "backlog";
+        var civicOrch2 = Civic.addIssue(civicFair, "r-bend");
+        civicOrch2.status = "backlog";
+        var civicFocus = Civic.facilitatorCheck(civicFair);
+        check("civic facilitator rebalances a lopsided day",
+              civicFocus === "orchard" && civicFair.fairness.posts === 1, String(civicFocus));
+
+        var civicNight = Civic.create(91, 10);
+        for (var cn = 0; cn < 6; ++cn) Civic.advance(civicNight);
+        var civicReflections = civicNight.reflections;
+        var civicReflectOk = civicReflections.length > 0;
+        for (var cr = 0; cr < civicReflections.length; ++cr) {
+            var civicReflection = civicReflections[cr];
+            if (!civicReflection.saw.length) civicReflectOk = false;
+            if (civicReflection.honesty.indexOf("Rule-generated") !== 0) civicReflectOk = false;
+            for (var cs = 0; cs < civicReflection.saw.length; ++cs) {
+                var civicSeen = civicReflection.saw[cs];
+                var civicSeenIssue = null;
+                for (var csi = 0; csi < civicNight.issues.length; ++csi)
+                    if (civicNight.issues[csi].id === civicSeen) civicSeenIssue = civicNight.issues[csi];
+                var civicLinked = civicSeenIssue &&
+                        (civicSeenIssue.owner === civicReflection.persona ||
+                         civicSeenIssue.partner === civicReflection.persona ||
+                         civicSeenIssue.verifiedBy === civicReflection.persona);
+                if (!civicLinked) civicReflectOk = false;
+            }
+        }
+        check("civic reflections cite only witnessed issues", civicReflectOk, civicReflections.length);
+
+        function civicSignature(seed) {
+            var state = Civic.create(seed, 10);
+            for (var turn = 0; turn < 12; ++turn) Civic.advance(state);
+            var rows = [];
+            for (var issueIndex = 0; issueIndex < state.issues.length; ++issueIndex) {
+                var row = state.issues[issueIndex];
+                rows.push([row.id, row.templateId, row.status, row.owner, row.cost].join("|"));
+            }
+            return rows.join(";");
+        }
+        check("civic engine is deterministic for a seed", civicSignature(88) === civicSignature(88));
+
+        var civicDayGuard = 0;
+        while (!civicRun.done && civicDayGuard < 80) {
+            Civic.advance(civicRun);
+            civicDayGuard += 1;
+        }
+        var civicMetrics = Civic.metrics(civicRun);
+        check("civic keeps the budget inside the pool",
+              civicRun.budget.spent <= civicRun.budget.pool && civicRun.budget.spent > 0,
+              civicRun.budget.spent);
+        check("civic closes work with evidence across a week",
+              civicMetrics.closed > 5 && civicMetrics.trust > 0 && civicMetrics.trust <= 1,
+              JSON.stringify(civicMetrics));
+        check("civic files a dusk digest for every day",
+              civicRun.digests.length === 7 && Civic.digestToday(civicRun) !== null,
+              civicRun.digests.length);
+        var civicGateOk = true;
+        var civicKnownGates = ["permit", "treasury", "safety-critical", "confidence", "budget", "rights"];
+        for (var cg = 0; cg < civicRun.escalations.length; ++cg)
+            if (civicKnownGates.indexOf(civicRun.escalations[cg].reason) === -1) civicGateOk = false;
+        check("civic keeps asks to known human gates", civicGateOk, civicRun.escalations.length);
+        check("civic limits are honest", Civic.LIMITS.indexOf("Simulation only") === 0, Civic.LIMITS.slice(0, 24));
+
+        var civicCrew = Civic.create(1947, 10);
+        var civicCrewGuard = 0;
+        while (!civicCrew.done && civicCrewGuard < 80) { Civic.advance(civicCrew); civicCrewGuard += 1; }
+        var civicCrewMetrics = Civic.metrics(civicCrew);
+        check("civic agents consult, pair, hand off and peer-check",
+              civicCrewMetrics.consults > 0 && civicCrewMetrics.joint > 0 &&
+              civicCrewMetrics.handoffs > 0 && civicCrewMetrics.reviews > 0,
+              civicCrewMetrics.consults + "/" + civicCrewMetrics.joint + "/" +
+              civicCrewMetrics.handoffs + "/" + civicCrewMetrics.reviews);
+
+        var civicPeerOk = true;
+        for (var cpi = 0; cpi < civicCrew.issues.length; ++cpi) {
+            var civicWork = civicCrew.issues[cpi];
+            if (civicWork.partner && (civicWork.partner === civicWork.owner || !Civic.personaById(civicWork.partner))) civicPeerOk = false;
+            if (civicWork.verifiedBy && (civicWork.verifiedBy === civicWork.owner || !Civic.personaById(civicWork.verifiedBy))) civicPeerOk = false;
+            if (civicWork.handoffFrom && (civicWork.handoffFrom === civicWork.owner || !Civic.personaById(civicWork.handoffFrom))) civicPeerOk = false;
+        }
+        check("civic collaborators are real agents, never self", civicPeerOk, civicCrew.issues.length);
+
+        var civicLinks = Civic.collabPairs(civicCrew, 0);
+        var civicLinkSum = 0;
+        var civicLinkOk = civicLinks.length > 0;
+        for (var cl = 0; cl < civicLinks.length; ++cl) {
+            var civicPair = civicLinks[cl];
+            civicLinkSum += Civic.pairTotal(civicPair);
+            if (civicPair.a === civicPair.b || Civic.pairTotal(civicPair) <= 0) civicLinkOk = false;
+        }
+        check("civic crew links reconcile with the counters",
+              civicLinkOk && civicLinkSum === civicCrewMetrics.links,
+              civicLinks.length + " links=" + civicLinkSum + "/" + civicCrewMetrics.links);
+
+        var civicCredited = 0;
+        var civicCreditOk = true;
+        for (var ccr = 0; ccr < civicCrew.reflections.length; ++ccr) {
+            var civicRec = civicCrew.reflections[ccr];
+            if (!civicRec.partners || !civicRec.partners.length) continue;
+            civicCredited += 1;
+            if (civicRec.partners.indexOf(civicRec.agent) !== -1) civicCreditOk = false;
+            if (civicRec.takeaway.indexOf("Worked with ") === -1) civicCreditOk = false;
+        }
+        check("civic reflections credit the agents they worked with",
+              civicCredited > 0 && civicCreditOk, civicCredited);
+
+        var civicCapacityOk = true;
+        for (var ccp = 0; ccp < Civic.PERSONAS.length; ++ccp) {
+            var civicHolder = Civic.PERSONAS[ccp];
+            var civicHeld = 0;
+            for (var cci = 0; cci < civicCrew.issues.length; ++cci) {
+                var civicActive = civicCrew.issues[cci];
+                if (civicActive.status !== "assigned" && civicActive.status !== "actioned" && civicActive.status !== "awaiting") continue;
+                if (civicActive.owner === civicHolder.id || civicActive.partner === civicHolder.id) civicHeld += 1;
+            }
+            if (civicHeld > 2) civicCapacityOk = false;
+        }
+        check("civic paired work still respects the two-task cap", civicCapacityOk);
+
+        app.navigate("civic");
+        check("civic tab is registered after agro",
+              app.pageOrder.indexOf("civic") === app.pageOrder.indexOf("agro") + 1 && app.activePage === "civic",
+              app.activePage);
+        check("civic tab has page metadata",
+              app.pageMeta.civic && app.pageMeta.civic.section === "Civic" && app.pageMeta.civic.title.length > 4,
+              app.pageMeta.civic ? app.pageMeta.civic.title : "missing");
+        app.navigate("overview");
 
         // 12. Field map, produce inventory and calendar
         app.setRole("dhun");
@@ -488,7 +760,7 @@ Window {
         app.navigate("case");
         check("case tab is registered", app.pageOrder.indexOf("case") !== -1 && app.activePage === "case", app.activePage);
         check("case tab has page metadata", app.pageMeta.case && app.pageMeta.case.title === "The 500-acre case", app.pageMeta.case ? app.pageMeta.case.title : "missing");
-        check("case tab is the last workspace entry", app.pageOrder.length === 11 && app.pageOrder[10] === "case", app.pageOrder.join(","));
+        check("case tab is the last workspace entry", app.pageOrder.length === 13 && app.pageOrder[12] === "case", app.pageOrder.join(","));
         app.navigate("overview");
         check("case page leaves the workspace intact", app.activePage === "overview" && app.state.people.length === people0 + 1, app.activePage);
 

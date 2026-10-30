@@ -1,0 +1,46 @@
+; Vendored from hackyguru/xenia inference-core (inference 0.1.0, MIT/Apache-2.0).
+; In-tree so the Dhun Commons build reads the contract without evaluating the
+; Xenia flake and its nested delivery_module input.
+;
+; inference-core — prompts over a logos-delivery content topic, answered by a
+; Xenia provider running a local Ollama model. The module is loaded in Basecamp
+; next to an `inference_provider` node that subscribes to the same room.
+; Method names are the module's own Q_INVOKABLE names (camelCase).
+module inference {
+  version "0.1.0"
+  description "AI inference over logos-delivery — prompts into a content topic, responses from a provider."
+  category "example"
+
+  ; Delivery lifecycle — 0=off, 1=connecting, 2=connected, 3=error
+  method startDelivery() -> bool
+  method stopDelivery() -> bool
+  method deliveryStatus() -> int
+
+  ; Room = the shared content topic /inference/1/<room>/json.
+  method joinRoom(room: tstr) -> bool
+  method room() -> tstr
+
+  ; Send a prompt into the current room. Returns the prompt id (empty on failure).
+  method sendPrompt(prompt: tstr) -> tstr
+
+  ; Compact JSON — prompts plus their responses, keyed by id.
+  method listExchanges() -> tstr
+  method clearExchanges() -> bool
+  method myId() -> tstr
+
+  ; Compact JSON: { initialized, backend, fingerprint, signPk, boxPk }
+  method identityStatus() -> tstr
+  ; Returns the mnemonic (display once, never stored); "" on the seed-file
+  ; backend or if an identity already exists.
+  method createAccount(passphrase: tstr) -> tstr
+  method importAccount(mnemonic: tstr, passphrase: tstr) -> bool
+  ; Verified provider roster: JSON array [{ id, model, load, ageMs, live }].
+  method listProviders() -> tstr
+  ; Active prepaid sessions: JSON array.
+  method paymentStatus() -> tstr
+
+  method unlock(passphrase: tstr) -> bool
+  method setRequireEncryption(required: bool) -> bool
+  method setPreferredProvider(fingerprint: tstr) -> bool
+  method setModelFilter(model: tstr) -> bool
+}

@@ -28,6 +28,8 @@ Rectangle {
     readonly property var navItems: [
         { key: "overview", label: "Overview", icon: "grid", badge: "" },
         { key: "field", label: "Field map", icon: "map", badge: "" },
+        { key: "agro", label: "Agro & conservation", icon: "leaf", badge: "" },
+        { key: "civic", label: "Civic simulation", icon: "civic", badge: "" },
         { key: "kitchen", label: "Kitchen", icon: "kitchen", badge: "" },
         { key: "market", label: "Market", icon: "market", badge: "" },
         { key: "projects", label: "Projects", icon: "projects", badge: "" },

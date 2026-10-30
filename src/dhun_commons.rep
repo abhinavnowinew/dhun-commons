@@ -14,6 +14,10 @@ class DhunCommons
     SLOT(QString startMenuPhoto(QString path, QString endpoint, QString model, QString prompt))
     SLOT(QString aiChat(QString requestJson))
     SLOT(QString aiStatus())
+    SLOT(QString agroForecast(QString requestJson))
+    SLOT(QString xeniaAccount(QString passphrase))
+    SLOT(QString signalRelay())
+    SLOT(QString publishSignalAnswer(QString id, QString text))
     SLOT(QString readTextFile(QString path))
 
     PROP(QString chainStatus="uninitialized" READONLY)

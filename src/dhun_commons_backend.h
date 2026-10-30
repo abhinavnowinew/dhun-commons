@@ -27,6 +27,10 @@ public:
     QString startMenuPhoto(QString path, QString endpoint, QString model, QString prompt) override;
     QString aiChat(QString requestJson) override;
     QString aiStatus() override;
+    QString agroForecast(QString requestJson) override;
+    QString xeniaAccount(QString passphrase) override;
+    QString signalRelay() override;
+    QString publishSignalAnswer(QString id, QString text) override;
     QString readTextFile(QString path) override;
 
     void onContextReady() override;
@@ -60,6 +64,11 @@ private:
     AiConfig aiConfig() const;
     QJsonObject localModelInfo();
     QString localAssistantChat(QJsonObject payload, QString model, QString endpoint);
+    QJsonObject xeniaState();
+    QString xeniaChat(const QJsonArray& messages, double temperature, int maxTokens);
+    QString xeniaPromptText(const QJsonArray& messages) const;
+    QString signalRelayDirectory() const;
+    bool ensureSignalRelayDirectory(QString* error);
 
     bool m_contextReady = false;
     bool m_walletOpen = false;

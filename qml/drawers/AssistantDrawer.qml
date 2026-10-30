@@ -30,7 +30,16 @@ SideSheet {
 
     readonly property bool configured: status && status.configured === true
     readonly property string modelLabel: status && status.model ? String(status.model) : "local model"
-    readonly property string providerLabel: status && status.provider === "ollama" ? "Local Ollama" : "OpenRouter"
+    readonly property string providerLabel: status && status.provider === "ollama"
+                                            ? "Local Ollama"
+                                            : (status && status.provider === "xenia" ? "Xenia" : "OpenRouter")
+    readonly property var xenia: status && status.xenia && typeof status.xenia === "object" ? status.xenia : null
+    readonly property bool xeniaHint: !!xenia && xenia.available === true && xenia.ready !== true
+    readonly property bool xeniaNeedsUnlock: !!xenia && xenia.available === true && xenia.locked === true
+    readonly property bool xeniaNeedsCreate: !!xenia && xenia.available === true &&
+                                             xenia.initialized !== true && xenia.locked !== true
+    property string xeniaPassphrase: ""
+    property bool xeniaBusy: false
 
     onOpenChanged: {
         if (!open) return;
@@ -104,7 +113,8 @@ SideSheet {
             }
             var seconds = Math.max(0.1, Number(snapshot.seconds) || 0);
             var provider = String(snapshot.provider || drawer.status.provider || "openrouter");
-            var providerName = provider === "ollama" ? "Local Ollama" : "OpenRouter";
+            var providerName = provider === "ollama" ? "Local Ollama"
+                             : (provider === "xenia" ? "Xenia" : "OpenRouter");
             drawer.appendMessage(snapshot.content, false, provider,
                 providerName + " · " + String(snapshot.model || drawer.modelLabel) +
                 " · " + seconds.toFixed(1) + " s");
@@ -122,6 +132,38 @@ SideSheet {
     function usePrompt(prompt) {
         draft = prompt;
         inputArea.forceActiveFocus();
+    }
+
+    function createXeniaIdentity() {
+        if (!backendReady || xeniaBusy) return;
+        xeniaBusy = true;
+        logos.watch(backend.xeniaAccount(xeniaPassphrase), function (value) {
+            drawer.xeniaBusy = false;
+            drawer.xeniaPassphrase = "";
+            var reply = {};
+            try { reply = JSON.parse(String(value)); } catch (error) { reply = {}; }
+            if (!reply.success) {
+                drawer.appendMessage(reply.error || "Xenia did not provision the identity.",
+                                     false, "xenia", "Xenia identity");
+                drawer.refreshStatus();
+                return;
+            }
+            var line = reply.unlocked
+                     ? "Xenia identity unlocked."
+                     : (reply.created ? "Xenia identity created." : "Xenia identity already exists.");
+            if (reply.fingerprint)
+                line += " Fingerprint " + String(reply.fingerprint).substring(0, 12) + "…";
+            if (reply.note)
+                line += " " + String(reply.note);
+            if (reply.mnemonic)
+                line += "\n\nBack up this seed phrase now — it is shown once:\n" + String(reply.mnemonic);
+            drawer.appendMessage(line, false, "xenia", "Xenia identity");
+            drawer.refreshStatus();
+        }, function (error) {
+            drawer.xeniaBusy = false;
+            drawer.appendMessage("The Xenia identity request failed: " + error,
+                                 false, "xenia", "Xenia identity");
+        });
     }
 
     Rectangle {
@@ -171,13 +213,80 @@ SideSheet {
                     text: drawer.configured
                           ? (drawer.status.provider === "ollama"
                              ? "Local inference · prompts stay on this device"
-                             : "Remote inference · prompts leave this device · key read at runtime")
-                          : "Built-in guidance still works. Start local Ollama or configure OpenRouter for remote answers."
+                             : (drawer.status.provider === "xenia"
+                                ? "Xenia over Logos delivery · room '" + String(drawer.status.room || "agora") +
+                                  "' · answered by the provider's local model"
+                                : "Remote inference · prompts leave this device · key read at runtime"))
+                          : "Built-in guidance still works. Start local Ollama, run Xenia, or configure OpenRouter for remote answers."
                     color: Theme.muted
                     font.family: Theme.uiFont
                     font.pixelSize: 8
                     wrapMode: Text.WordWrap
                 }
+            }
+        }
+    }
+
+    Text {
+        Layout.fillWidth: true
+        visible: drawer.statusChecked && drawer.xeniaHint
+        text: "Xenia: " + String(drawer.xenia && drawer.xenia.hint ? drawer.xenia.hint : "the router is not ready.")
+        color: Theme.muted
+        font.family: Theme.uiFont
+        font.pixelSize: 8
+        lineHeight: 1.4
+        wrapMode: Text.WordWrap
+    }
+
+    Rectangle {
+        Layout.fillWidth: true
+        visible: drawer.statusChecked && (drawer.xeniaNeedsCreate || drawer.xeniaNeedsUnlock)
+        Layout.preferredHeight: identityRow.implicitHeight + 18
+        radius: 11
+        color: Theme.white
+        border.width: 1
+        border.color: Theme.line
+
+        RowLayout {
+            id: identityRow
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
+            spacing: 8
+
+            TextField {
+                id: xeniaPassphraseField
+                Layout.fillWidth: true
+                Layout.preferredHeight: 34
+                placeholderText: drawer.xeniaNeedsUnlock ? "Identity passphrase" : "Passphrase (optional)"
+                placeholderTextColor: Theme.mutedLight
+                color: Theme.ink
+                font.family: Theme.uiFont
+                font.pixelSize: 9
+                echoMode: TextInput.Password
+                selectByMouse: true
+                text: drawer.xeniaPassphrase
+                onTextEdited: drawer.xeniaPassphrase = text
+                background: Rectangle {
+                    radius: 8
+                    color: Theme.paperWarm
+                    border.width: 1
+                    border.color: xeniaPassphraseField.activeFocus ? "#A8BE9B" : Theme.lineSoft
+                }
+            }
+
+            ActionButton {
+                compact: true
+                variant: "lime"
+                fontSize: 8
+                text: drawer.xeniaBusy
+                      ? "Working…"
+                      : (drawer.xeniaNeedsUnlock ? "Unlock" : "Create identity")
+                enabled: !drawer.xeniaBusy &&
+                         (!drawer.xeniaNeedsUnlock || drawer.xeniaPassphrase.trim().length > 0)
+                onClicked: drawer.createXeniaIdentity()
             }
         }
     }

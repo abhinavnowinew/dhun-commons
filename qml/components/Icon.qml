@@ -209,6 +209,17 @@ Canvas {
             ctx.quadraticCurveTo(s * 0.8, s * 0.68, s * 0.2, s * 0.8);
             ctx.stroke();
             line(s * 0.26, s * 0.74, s * 0.64, s * 0.36);
+        } else if (name === "civic") {
+            circle(cx, s * 0.3, s * 0.1);
+            circle(s * 0.18, s * 0.42, s * 0.07);
+            circle(s * 0.82, s * 0.42, s * 0.07);
+            ctx.beginPath();
+            ctx.moveTo(s * 0.24, s * 0.86);
+            ctx.quadraticCurveTo(s * 0.28, s * 0.62, cx, s * 0.62);
+            ctx.quadraticCurveTo(s * 0.72, s * 0.62, s * 0.76, s * 0.86);
+            ctx.stroke();
+            line(s * 0.08, s * 0.74, s * 0.12, s * 0.63);
+            line(s * 0.92, s * 0.74, s * 0.88, s * 0.63);
         } else if (name === "plus") {
             line(cx, s * 0.2, cx, s * 0.8);
             line(s * 0.2, cy, s * 0.8, cy);

@@ -8,6 +8,7 @@
 #include <QEventLoop>
 #include <QFile>
 #include <QFileInfo>
+#include <QHash>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -20,6 +21,9 @@
 #include <QStandardPaths>
 #include <QTimer>
 #include <QUrl>
+#include <QUrlQuery>
+
+#include <cmath>
 
 namespace {
 
@@ -35,12 +39,36 @@ const char kOpenRouterUrl[] = "https://openrouter.ai/api/v1/chat/completions";
 const char kOpenRouterDefaultModel[] = "openai/gpt-4o";
 const int kMaxAiMessages = 40;
 const int kMaxAiPromptChars = 24000;
+const char kXeniaRoomDefault[] = "agora";
+const int kXeniaPollMs = 1200;
+const int kXeniaWaitMs = 100000;
+const int kMaxXeniaPromptChars = 12000;
+const int kMaxSignalAnswerChars = 4000;
 const int kMaxTextFileBytes = 256 * 1024;
 const int kMaxTextChars = 120000;
+const char kOpenMeteoUrl[] = "https://api.open-meteo.com/v1/forecast";
+const char kAgroDailyVars[] =
+    "weather_code,temperature_2m_max,temperature_2m_min,"
+    "apparent_temperature_max,apparent_temperature_min,"
+    "precipitation_sum,precipitation_probability_max,"
+    "wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant,"
+    "relative_humidity_2m_mean,et0_fao_evapotranspiration,"
+    "shortwave_radiation_sum,uv_index_max,"
+    "soil_moisture_0_to_10cm_mean,dew_point_2m_mean,cloud_cover_mean";
+const char kAgroCurrentVars[] =
+    "temperature_2m,relative_humidity_2m,precipitation,weather_code,"
+    "wind_speed_10m,wind_gusts_10m,wind_direction_10m,"
+    "soil_moisture_0_to_10cm,soil_temperature_6cm";
+const qint64 kAgroCacheMs = 30 * 60 * 1000;
 
 struct Role {
     const char* key;
     const char* name;
+};
+
+struct AgroCacheEntry {
+    qint64 savedAt = 0;
+    QJsonObject payload;
 };
 
 const Role kRoles[] = {
@@ -60,6 +88,23 @@ QJsonObject failureObject(const QString& error)
     obj.insert(QStringLiteral("success"), false);
     obj.insert(QStringLiteral("error"), error);
     return obj;
+}
+
+void insertNumber(QJsonObject& obj, const char* key, double value)
+{
+    obj.insert(QString::fromLatin1(key),
+               std::isfinite(value) ? QJsonValue(value) : QJsonValue(QJsonValue::Null));
+}
+
+double seriesValue(const QJsonObject& series, const char* key, int index)
+{
+    const QJsonArray values = series.value(QString::fromLatin1(key)).toArray();
+    if (index < 0 || index >= values.size())
+        return qQNaN();
+    const QJsonValue value = values.at(index);
+    if (value.isNull() || value.isUndefined())
+        return qQNaN();
+    return value.toDouble(qQNaN());
 }
 
 QString redactSecret(QString text, const QString& secret)
@@ -843,6 +888,175 @@ QString DhunCommonsBackend::ackTelegramMessage(QString id)
     return jsonCompact(result);
 }
 
+QString DhunCommonsBackend::signalRelayDirectory() const
+{
+    // The Signal bridge writes into the same relay folder as the Telegram
+    // bridge; only the file names differ (asks.json / signal_bridge.json).
+    return telegramDirectory();
+}
+
+bool DhunCommonsBackend::ensureSignalRelayDirectory(QString* error)
+{
+    return ensureTelegramDirectory(error);
+}
+
+QString DhunCommonsBackend::signalRelay()
+{
+    QString error;
+    if (!ensureSignalRelayDirectory(&error))
+        return jsonCompact(failureObject(error));
+
+    const QDir dir(signalRelayDirectory());
+
+    QJsonArray asks;
+    QFile asksFile(dir.filePath(QStringLiteral("asks.json")));
+    if (asksFile.open(QIODevice::ReadOnly)) {
+        const QJsonDocument document = QJsonDocument::fromJson(asksFile.readAll());
+        if (document.isArray())
+            asks = document.array();
+        else if (document.isObject())
+            asks = document.object().value(QStringLiteral("asks")).toArray();
+    }
+
+    QSet<QString> answered;
+    QFile answersFile(dir.filePath(QStringLiteral("answers.json")));
+    if (answersFile.open(QIODevice::ReadOnly)) {
+        const QJsonDocument document = QJsonDocument::fromJson(answersFile.readAll());
+        QJsonArray answers = document.isArray()
+            ? document.array()
+            : document.object().value(QStringLiteral("answers")).toArray();
+        for (const QJsonValue& value : answers) {
+            const QString id = value.toObject().value(QStringLiteral("id")).toString();
+            if (!id.isEmpty())
+                answered.insert(id);
+        }
+    }
+
+    QJsonArray pending;
+    for (const QJsonValue& value : asks) {
+        const QJsonObject ask = value.toObject();
+        const QString id = ask.value(QStringLiteral("id")).toString();
+        if (id.isEmpty() || answered.contains(id))
+            continue;
+        pending.append(ask);
+    }
+    const int start = qMax(0, static_cast<int>(pending.size()) - 10);
+    QJsonArray trimmed;
+    for (int i = start; i < pending.size(); ++i)
+        trimmed.append(pending.at(i));
+
+    QJsonObject bridge;
+    QFile beat(dir.filePath(QStringLiteral("signal_bridge.json")));
+    if (beat.open(QIODevice::ReadOnly)) {
+        const QJsonDocument document = QJsonDocument::fromJson(beat.read(8192));
+        if (document.isObject())
+            bridge = document.object();
+    }
+
+    QJsonObject result;
+    result.insert(QStringLiteral("success"), true);
+    result.insert(QStringLiteral("dir"), signalRelayDirectory());
+    result.insert(QStringLiteral("asks"), trimmed);
+    result.insert(QStringLiteral("pending"), static_cast<int>(trimmed.size()));
+    result.insert(QStringLiteral("bridge"), bridge);
+    return jsonCompact(result);
+}
+
+QString DhunCommonsBackend::publishSignalAnswer(QString id, QString text)
+{
+    const QString key = id.trimmed();
+    if (key.isEmpty())
+        return jsonCompact(failureObject(QStringLiteral("A Signal ask id is required.")));
+    QString body = text.trimmed();
+    if (body.isEmpty())
+        return jsonCompact(failureObject(QStringLiteral("The Signal answer is empty.")));
+    if (body.size() > kMaxSignalAnswerChars)
+        body = body.left(kMaxSignalAnswerChars);
+
+    QString error;
+    if (!ensureSignalRelayDirectory(&error))
+        return jsonCompact(failureObject(error));
+
+    const QDir dir(signalRelayDirectory());
+    const QString answersPath = dir.filePath(QStringLiteral("answers.json"));
+
+    QJsonArray answers;
+    QFile existing(answersPath);
+    if (existing.open(QIODevice::ReadOnly)) {
+        const QJsonDocument document = QJsonDocument::fromJson(existing.readAll());
+        answers = document.isArray()
+            ? document.array()
+            : document.object().value(QStringLiteral("answers")).toArray();
+        existing.close();
+    }
+
+    QJsonArray kept;
+    for (const QJsonValue& value : answers) {
+        if (value.toObject().value(QStringLiteral("id")).toString() == key)
+            continue;
+        kept.append(value);
+    }
+    const int start = qMax(0, static_cast<int>(kept.size()) - 49);
+    QJsonArray keptTrimmed;
+    for (int i = start; i < kept.size(); ++i)
+        keptTrimmed.append(kept.at(i));
+
+    QJsonObject entry;
+    entry.insert(QStringLiteral("id"), key);
+    entry.insert(QStringLiteral("channel"), QStringLiteral("signal"));
+    entry.insert(QStringLiteral("text"), body);
+    entry.insert(QStringLiteral("source"), QStringLiteral("dhun_commons"));
+    entry.insert(QStringLiteral("at"), static_cast<double>(QDateTime::currentMSecsSinceEpoch()));
+    keptTrimmed.append(entry);
+
+    QJsonObject root;
+    root.insert(QStringLiteral("version"), 1);
+    root.insert(QStringLiteral("answers"), keptTrimmed);
+    QSaveFile file(answersPath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        return jsonCompact(failureObject(QStringLiteral("Could not open the Signal answers file for writing.")));
+    file.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
+    if (!file.commit())
+        return jsonCompact(failureObject(QStringLiteral("Could not save the Signal answer.")));
+
+    const QString asksPath = dir.filePath(QStringLiteral("asks.json"));
+    QJsonArray asks;
+    QFile asksFile(asksPath);
+    if (asksFile.open(QIODevice::ReadOnly)) {
+        const QJsonDocument document = QJsonDocument::fromJson(asksFile.readAll());
+        asks = document.isArray()
+            ? document.array()
+            : document.object().value(QStringLiteral("asks")).toArray();
+        asksFile.close();
+    }
+    QJsonArray asksKept;
+    bool removedAsk = false;
+    for (const QJsonValue& value : asks) {
+        if (value.toObject().value(QStringLiteral("id")).toString() == key) {
+            removedAsk = true;
+            continue;
+        }
+        asksKept.append(value);
+    }
+    if (removedAsk) {
+        QJsonObject askRoot;
+        askRoot.insert(QStringLiteral("version"), 1);
+        askRoot.insert(QStringLiteral("asks"), asksKept);
+        QSaveFile askFile(asksPath);
+        if (askFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            askFile.write(QJsonDocument(askRoot).toJson(QJsonDocument::Indented));
+            askFile.commit();
+        }
+    }
+
+    QJsonObject result;
+    result.insert(QStringLiteral("success"), true);
+    result.insert(QStringLiteral("id"), key);
+    result.insert(QStringLiteral("path"), answersPath);
+    result.insert(QStringLiteral("removedAsk"), removedAsk);
+    return jsonCompact(result);
+}
+
 bool DhunCommonsBackend::readPhotoBytes(const QString& path,
                                         QByteArray* bytes,
                                         QString* mime,
@@ -1011,6 +1225,163 @@ QString DhunCommonsBackend::probeModelServer(QString endpoint)
     result.insert(QStringLiteral("url"), modelsUrl);
     result.insert(QStringLiteral("models"), names);
     return jsonCompact(result);
+}
+
+QString DhunCommonsBackend::agroForecast(QString requestJson)
+{
+    QJsonObject request;
+    const QJsonDocument requestDoc = QJsonDocument::fromJson(requestJson.toUtf8());
+    if (requestDoc.isObject())
+        request = requestDoc.object();
+
+    double latitude = request.value(QStringLiteral("latitude")).toDouble(qQNaN());
+    double longitude = request.value(QStringLiteral("longitude")).toDouble(qQNaN());
+    if (!std::isfinite(latitude) || latitude < -90.0 || latitude > 90.0)
+        latitude = 26.7113;
+    if (!std::isfinite(longitude) || longitude < -180.0 || longitude > 180.0)
+        longitude = 75.5901;
+    const int days = qBound(1, request.value(QStringLiteral("days")).toInt(7), 14);
+
+    QString timezone = request.value(QStringLiteral("timezone")).toString().trimmed();
+    static const QRegularExpression tzPattern(QStringLiteral("^[A-Za-z][A-Za-z0-9_/+-]{0,63}$"));
+    if (timezone.isEmpty() || !tzPattern.match(timezone).hasMatch())
+        timezone = QStringLiteral("Asia/Kolkata");
+
+    const QString cacheKey = QStringLiteral("%1|%2|%3|%4")
+                                 .arg(latitude, 0, 'f', 3)
+                                 .arg(longitude, 0, 'f', 3)
+                                 .arg(days)
+                                 .arg(timezone);
+    static QHash<QString, AgroCacheEntry> cache;
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    auto cached = cache.constFind(cacheKey);
+    if (cached != cache.constEnd() && now - cached->savedAt < kAgroCacheMs) {
+        QJsonObject payload = cached->payload;
+        payload.insert(QStringLiteral("cached"), true);
+        return jsonCompact(payload);
+    }
+
+    QUrl url(QString::fromLatin1(kOpenMeteoUrl));
+    QUrlQuery query;
+    query.addQueryItem(QStringLiteral("latitude"), QString::number(latitude, 'f', 4));
+    query.addQueryItem(QStringLiteral("longitude"), QString::number(longitude, 'f', 4));
+    query.addQueryItem(QStringLiteral("daily"), QString::fromLatin1(kAgroDailyVars));
+    query.addQueryItem(QStringLiteral("current"), QString::fromLatin1(kAgroCurrentVars));
+    query.addQueryItem(QStringLiteral("forecast_days"), QString::number(days));
+    query.addQueryItem(QStringLiteral("wind_speed_unit"), QStringLiteral("kmh"));
+    query.addQueryItem(QStringLiteral("timezone"), timezone);
+    url.setQuery(query);
+
+    QNetworkAccessManager network;
+    QNetworkRequest httpRequest{url};
+    httpRequest.setTransferTimeout(8000);
+    QNetworkReply* reply = network.get(httpRequest);
+    QEventLoop loop;
+    QTimer guard;
+    guard.setSingleShot(true);
+    QObject::connect(&guard, &QTimer::timeout, &loop, &QEventLoop::quit);
+    QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    guard.start(9000);
+    loop.exec();
+
+    if (!reply->isFinished()) {
+        reply->abort();
+        reply->deleteLater();
+        QJsonObject failure = failureObject(QStringLiteral("The forecast service did not answer within 9 seconds."));
+        failure.insert(QStringLiteral("source"), QStringLiteral("open-meteo"));
+        return jsonCompact(failure);
+    }
+
+    const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    const QByteArray body = reply->readAll();
+    const QString networkError = reply->errorString();
+    const bool failed = reply->error() != QNetworkReply::NoError && status == 0;
+    reply->deleteLater();
+
+    if (failed) {
+        QJsonObject failure = failureObject(QStringLiteral("No forecast reply: ") + networkError);
+        failure.insert(QStringLiteral("source"), QStringLiteral("open-meteo"));
+        return jsonCompact(failure);
+    }
+    if (status < 200 || status >= 300) {
+        QJsonObject failure = failureObject(QStringLiteral("The forecast service replied with HTTP ")
+                                            + QString::number(status) + QLatin1Char('.'));
+        failure.insert(QStringLiteral("source"), QStringLiteral("open-meteo"));
+        failure.insert(QStringLiteral("status"), status);
+        return jsonCompact(failure);
+    }
+
+    const QJsonObject root = QJsonDocument::fromJson(body).object();
+    const QJsonObject daily = root.value(QStringLiteral("daily")).toObject();
+    const QJsonArray dates = daily.value(QStringLiteral("time")).toArray();
+    if (dates.isEmpty()) {
+        QJsonObject failure = failureObject(QStringLiteral("The forecast reply carried no daily series."));
+        failure.insert(QStringLiteral("source"), QStringLiteral("open-meteo"));
+        return jsonCompact(failure);
+    }
+
+    QJsonArray outDays;
+    for (int index = 0; index < dates.size() && index < days; ++index) {
+        QJsonObject day;
+        day.insert(QStringLiteral("date"), dates.at(index).toString());
+        insertNumber(day, "code", seriesValue(daily, "weather_code", index));
+        insertNumber(day, "tMax", seriesValue(daily, "temperature_2m_max", index));
+        insertNumber(day, "tMin", seriesValue(daily, "temperature_2m_min", index));
+        insertNumber(day, "apparentMax", seriesValue(daily, "apparent_temperature_max", index));
+        insertNumber(day, "apparentMin", seriesValue(daily, "apparent_temperature_min", index));
+        insertNumber(day, "rain", seriesValue(daily, "precipitation_sum", index));
+        insertNumber(day, "chance", seriesValue(daily, "precipitation_probability_max", index));
+        insertNumber(day, "wind", seriesValue(daily, "wind_speed_10m_max", index));
+        insertNumber(day, "gust", seriesValue(daily, "wind_gusts_10m_max", index));
+        insertNumber(day, "direction", seriesValue(daily, "wind_direction_10m_dominant", index));
+        insertNumber(day, "rh", seriesValue(daily, "relative_humidity_2m_mean", index));
+        insertNumber(day, "et0", seriesValue(daily, "et0_fao_evapotranspiration", index));
+        insertNumber(day, "radiation", seriesValue(daily, "shortwave_radiation_sum", index));
+        insertNumber(day, "uv", seriesValue(daily, "uv_index_max", index));
+        insertNumber(day, "soil", seriesValue(daily, "soil_moisture_0_to_10cm_mean", index));
+        insertNumber(day, "dew", seriesValue(daily, "dew_point_2m_mean", index));
+        insertNumber(day, "cloud", seriesValue(daily, "cloud_cover_mean", index));
+        outDays.append(day);
+    }
+
+    const QJsonObject source = root.value(QStringLiteral("current")).toObject();
+    QJsonObject current;
+    insertNumber(current, "temp", source.value(QStringLiteral("temperature_2m")).toDouble(qQNaN()));
+    insertNumber(current, "rh", source.value(QStringLiteral("relative_humidity_2m")).toDouble(qQNaN()));
+    insertNumber(current, "rain", source.value(QStringLiteral("precipitation")).toDouble(qQNaN()));
+    insertNumber(current, "code", source.value(QStringLiteral("weather_code")).toDouble(qQNaN()));
+    insertNumber(current, "wind", source.value(QStringLiteral("wind_speed_10m")).toDouble(qQNaN()));
+    insertNumber(current, "gust", source.value(QStringLiteral("wind_gusts_10m")).toDouble(qQNaN()));
+    insertNumber(current, "direction", source.value(QStringLiteral("wind_direction_10m")).toDouble(qQNaN()));
+    insertNumber(current, "soil", source.value(QStringLiteral("soil_moisture_0_to_10cm")).toDouble(qQNaN()));
+    insertNumber(current, "soilTemp", source.value(QStringLiteral("soil_temperature_6cm")).toDouble(qQNaN()));
+    current.insert(QStringLiteral("observedAt"), source.value(QStringLiteral("time")).toString());
+
+    QJsonObject response;
+    response.insert(QStringLiteral("success"), true);
+    response.insert(QStringLiteral("source"), QStringLiteral("open-meteo"));
+    response.insert(QStringLiteral("attribution"), QStringLiteral("Forecast data by Open-Meteo (CC BY 4.0)"));
+    response.insert(QStringLiteral("location"), request.value(QStringLiteral("location")).toString());
+    response.insert(QStringLiteral("label"), request.value(QStringLiteral("label")).toString());
+    response.insert(QStringLiteral("latitude"), latitude);
+    response.insert(QStringLiteral("longitude"), longitude);
+    response.insert(QStringLiteral("timezone"), timezone);
+    response.insert(QStringLiteral("elevation"), root.value(QStringLiteral("elevation")).toDouble(qQNaN()));
+    response.insert(QStringLiteral("fetchedAt"), now);
+    response.insert(QStringLiteral("cached"), false);
+    response.insert(QStringLiteral("units"), QJsonObject{
+        {QStringLiteral("temp"), QStringLiteral("°C")},
+        {QStringLiteral("rain"), QStringLiteral("mm")},
+        {QStringLiteral("wind"), QStringLiteral("km/h")},
+        {QStringLiteral("et0"), QStringLiteral("mm")},
+        {QStringLiteral("soil"), QStringLiteral("m³/m³")},
+        {QStringLiteral("uv"), QStringLiteral("index")}
+    });
+    response.insert(QStringLiteral("current"), current);
+    response.insert(QStringLiteral("days"), outDays);
+
+    cache.insert(cacheKey, AgroCacheEntry{now, response});
+    return jsonCompact(response);
 }
 
 QString DhunCommonsBackend::startMenuPhoto(QString path,
@@ -1346,18 +1717,39 @@ QString DhunCommonsBackend::localAssistantChat(QJsonObject payload, QString mode
 
 QString DhunCommonsBackend::aiStatus()
 {
+    const QJsonObject xenia = xeniaState();
+    if (xenia.value(QStringLiteral("ready")).toBool()) {
+        QJsonObject result;
+        result.insert(QStringLiteral("success"), true);
+        result.insert(QStringLiteral("configured"), true);
+        result.insert(QStringLiteral("provider"), QStringLiteral("xenia"));
+        result.insert(QStringLiteral("source"), QStringLiteral("xenia"));
+        result.insert(QStringLiteral("mode"), QStringLiteral("xenia-delivery"));
+        result.insert(QStringLiteral("model"), xenia.value(QStringLiteral("model")).toString());
+        result.insert(QStringLiteral("room"), xenia.value(QStringLiteral("room")).toString());
+        result.insert(QStringLiteral("xenia"), xenia);
+        result.insert(QStringLiteral("note"),
+                      QStringLiteral("Answers come from Xenia over Logos delivery (room '%1'). "
+                                     "The provider runs the local model; OpenRouter is only used "
+                                     "if Xenia is unavailable.")
+                          .arg(xenia.value(QStringLiteral("room")).toString()));
+        return jsonCompact(result);
+    }
+
     const QJsonObject local = localModelInfo();
     if (local.value(QStringLiteral("success")).toBool()) {
         QJsonObject result = local;
         result.insert(QStringLiteral("configured"), true);
         result.insert(QStringLiteral("source"), QStringLiteral("loopback"));
         result.insert(QStringLiteral("mode"), QStringLiteral("local-loopback"));
+        result.insert(QStringLiteral("xenia"), xenia);
         result.insert(QStringLiteral("note"), QStringLiteral("Local inference is active. Prompts and context stay on this device; no OpenRouter key is needed."));
         return jsonCompact(result);
     }
 
     const AiConfig cfg = aiConfig();
     QJsonObject result;
+    result.insert(QStringLiteral("xenia"), xenia);
     result.insert(QStringLiteral("success"), true);
     result.insert(QStringLiteral("configured"), !cfg.key.isEmpty());
     result.insert(QStringLiteral("source"), cfg.source);
@@ -1376,6 +1768,282 @@ QString DhunCommonsBackend::aiStatus()
         result.insert(QStringLiteral("warning"),
                       QStringLiteral("The OpenRouter config file is readable or writable by other "
                                      "users. Run chmod 600 on it."));
+    }
+    return jsonCompact(result);
+}
+
+QJsonObject DhunCommonsBackend::xeniaState()
+{
+    QJsonObject state;
+    state.insert(QStringLiteral("success"), false);
+    state.insert(QStringLiteral("available"), false);
+    state.insert(QStringLiteral("ready"), false);
+    if (!m_contextReady) {
+        state.insert(QStringLiteral("error"),
+                     QStringLiteral("The module backend is not ready inside Basecamp."));
+        return state;
+    }
+
+    const QString identityJson = modules().inference.identityStatus();
+    const QJsonObject identity = QJsonDocument::fromJson(identityJson.toUtf8()).object();
+    if (identity.isEmpty()) {
+        state.insert(QStringLiteral("error"),
+                     QStringLiteral("The Xenia inference module did not answer. Install the "
+                                    "inference LGX in Basecamp and reopen Dhun Commons."));
+        return state;
+    }
+
+    state.insert(QStringLiteral("success"), true);
+    state.insert(QStringLiteral("available"), true);
+    const bool initialized = identity.value(QStringLiteral("initialized")).toBool();
+    const bool locked = identity.value(QStringLiteral("locked")).toBool();
+    state.insert(QStringLiteral("initialized"), initialized);
+    state.insert(QStringLiteral("locked"), locked);
+    state.insert(QStringLiteral("fingerprint"), identity.value(QStringLiteral("fingerprint")).toString());
+    state.insert(QStringLiteral("backend"), identity.value(QStringLiteral("backend")).toString());
+    // Readiness needs a live provider, which needs the delivery node subscribed,
+    // and nothing else starts it: without this the roster stays empty forever
+    // and the assistant can never route through Xenia. startDelivery is
+    // idempotent, so polling status is a safe place to own the side effect.
+    if (modules().inference.deliveryStatus() == 0)
+        modules().inference.startDelivery();
+
+    state.insert(QStringLiteral("deliveryStatus"), modules().inference.deliveryStatus());
+    state.insert(QStringLiteral("room"), modules().inference.room());
+
+    const QJsonArray providers =
+        QJsonDocument::fromJson(modules().inference.listProviders().toUtf8()).array();
+    int live = 0;
+    QString liveModel;
+    for (const QJsonValue& value : providers) {
+        const QJsonObject provider = value.toObject();
+        if (!provider.value(QStringLiteral("live")).toBool())
+            continue;
+        live += 1;
+        if (liveModel.isEmpty())
+            liveModel = provider.value(QStringLiteral("model")).toString();
+    }
+    state.insert(QStringLiteral("providers"), static_cast<int>(providers.size()));
+    state.insert(QStringLiteral("liveProviders"), live);
+    if (!liveModel.isEmpty())
+        state.insert(QStringLiteral("model"), liveModel);
+
+    QString hint;
+    if (locked)
+        hint = QStringLiteral("The Xenia identity is locked. Unlock it from the assistant panel.");
+    else if (!initialized)
+        hint = QStringLiteral("Xenia has no identity yet. Create one from the assistant panel "
+                              "before prompts can be sealed to a provider.");
+    else if (live == 0)
+        hint = QStringLiteral("No live Xenia provider in room '%1'. Start the provider node "
+                              "(ollama + logoscore) and keep it running.")
+                   .arg(QString::fromLatin1(kXeniaRoomDefault));
+    if (!hint.isEmpty())
+        state.insert(QStringLiteral("hint"), hint);
+    state.insert(QStringLiteral("ready"), initialized && !locked && live > 0);
+    return state;
+}
+
+QString DhunCommonsBackend::xeniaPromptText(const QJsonArray& messages) const
+{
+    QStringList parts;
+    for (const QJsonValue& value : messages) {
+        const QJsonObject entry = value.toObject();
+        const QString role = entry.value(QStringLiteral("role")).toString();
+        const QString content = entry.value(QStringLiteral("content")).toString().trimmed();
+        if (content.isEmpty())
+            continue;
+        if (role == QStringLiteral("system"))
+            parts.append(QStringLiteral("Instructions: ") + content);
+        else if (role == QStringLiteral("assistant"))
+            parts.append(QStringLiteral("Assistant: ") + content);
+        else
+            parts.append(QStringLiteral("User: ") + content);
+    }
+    parts.append(QStringLiteral("Answer the last user message in plain text, under 180 words."));
+    QString text = parts.join(QStringLiteral("\n\n"));
+    if (text.size() > kMaxXeniaPromptChars) {
+        const int tail = kMaxXeniaPromptChars / 3;
+        const int head = kMaxXeniaPromptChars - tail - 5;
+        text = text.left(head) + QStringLiteral("\n…\n") + text.right(tail);
+    }
+    return text;
+}
+
+QString DhunCommonsBackend::xeniaChat(const QJsonArray& messages, double temperature, int maxTokens)
+{
+    Q_UNUSED(temperature);
+    Q_UNUSED(maxTokens);
+
+    QJsonObject result;
+    result.insert(QStringLiteral("provider"), QStringLiteral("xenia"));
+    const qint64 startedMs = QDateTime::currentMSecsSinceEpoch();
+
+    const QJsonObject state = xeniaState();
+    if (!state.value(QStringLiteral("ready")).toBool()) {
+        result.insert(QStringLiteral("success"), false);
+        result.insert(QStringLiteral("configured"), state.value(QStringLiteral("available")).toBool());
+        result.insert(QStringLiteral("error"),
+                      state.value(QStringLiteral("error")).toString(
+                          state.value(QStringLiteral("hint")).toString(
+                              QStringLiteral("The Xenia router is not ready."))));
+        return jsonCompact(result);
+    }
+
+    auto wait = [](int ms) {
+        QEventLoop loop;
+        QTimer::singleShot(ms, &loop, &QEventLoop::quit);
+        loop.exec();
+    };
+
+    if (modules().inference.deliveryStatus() == 0)
+        modules().inference.startDelivery();
+    for (int i = 0; i < 20 && modules().inference.deliveryStatus() != 2; ++i)
+        wait(250);
+    const int delivery = modules().inference.deliveryStatus();
+    result.insert(QStringLiteral("deliveryStatus"), delivery);
+    if (delivery != 2) {
+        result.insert(QStringLiteral("success"), false);
+        result.insert(QStringLiteral("error"),
+                      QStringLiteral("Xenia delivery did not connect (status %1). Check the "
+                                     "Logos delivery node and try again.").arg(delivery));
+        return jsonCompact(result);
+    }
+
+    QString room = qEnvironmentVariable("DHUN_XENIA_ROOM").trimmed();
+    if (room.isEmpty())
+        room = QString::fromLatin1(kXeniaRoomDefault);
+    if (modules().inference.room() != room)
+        modules().inference.joinRoom(room);
+    result.insert(QStringLiteral("room"), room);
+
+    const QString promptId = modules().inference.sendPrompt(xeniaPromptText(messages));
+    if (promptId.isEmpty()) {
+        result.insert(QStringLiteral("success"), false);
+        result.insert(QStringLiteral("error"),
+                      QStringLiteral("Xenia refused the prompt. No live provider answered the "
+                                     "room and encryption may be required."));
+        return jsonCompact(result);
+    }
+    result.insert(QStringLiteral("promptId"), promptId);
+
+    const qint64 deadline = QDateTime::currentMSecsSinceEpoch() + kXeniaWaitMs;
+    while (QDateTime::currentMSecsSinceEpoch() < deadline) {
+        wait(kXeniaPollMs);
+        const QJsonArray exchanges =
+            QJsonDocument::fromJson(modules().inference.listExchanges().toUtf8()).array();
+        for (const QJsonValue& value : exchanges) {
+            const QJsonObject exchange = value.toObject();
+            if (exchange.value(QStringLiteral("id")).toString() != promptId)
+                continue;
+            if (exchange.value(QStringLiteral("answered")).toBool()) {
+                const QString content = exchange.value(QStringLiteral("text")).toString().trimmed();
+                if (content.isEmpty())
+                    continue;
+                result.insert(QStringLiteral("success"), true);
+                result.insert(QStringLiteral("content"), content);
+                result.insert(QStringLiteral("model"), exchange.value(QStringLiteral("model")).toString());
+                result.insert(QStringLiteral("exchangesProvider"),
+                              exchange.value(QStringLiteral("provider")).toString());
+                result.insert(QStringLiteral("rttMs"), exchange.value(QStringLiteral("rttMs")).toDouble());
+                result.insert(QStringLiteral("sealed"), exchange.value(QStringLiteral("sealed")).toBool());
+                result.insert(QStringLiteral("seconds"),
+                              (QDateTime::currentMSecsSinceEpoch() - startedMs) / 1000.0);
+                return jsonCompact(result);
+            }
+            if (exchange.value(QStringLiteral("failed")).toBool()) {
+                result.insert(QStringLiteral("success"), false);
+                QString reason = exchange.value(QStringLiteral("reason")).toString().trimmed();
+                if (reason.isEmpty())
+                    reason = QStringLiteral("The provider did not answer.");
+                result.insert(QStringLiteral("error"), QStringLiteral("Xenia: ") + reason);
+                return jsonCompact(result);
+            }
+            break;
+        }
+    }
+
+    result.insert(QStringLiteral("success"), false);
+    result.insert(QStringLiteral("error"),
+                  QStringLiteral("Xenia did not answer within 100 seconds. Check that the "
+                                 "provider node is running in room '%1'.").arg(room));
+    return jsonCompact(result);
+}
+
+QString DhunCommonsBackend::xeniaAccount(QString passphrase)
+{
+    QJsonObject result;
+    result.insert(QStringLiteral("provider"), QStringLiteral("xenia"));
+    if (!m_contextReady)
+        return jsonCompact(failureObject(QStringLiteral("The module backend is not ready inside Basecamp.")));
+
+    const QJsonObject before =
+        QJsonDocument::fromJson(modules().inference.identityStatus().toUtf8()).object();
+    if (before.isEmpty()) {
+        result.insert(QStringLiteral("success"), false);
+        result.insert(QStringLiteral("error"),
+                      QStringLiteral("The Xenia inference module is not installed. Install the "
+                                     "inference LGX in Basecamp and reopen Dhun Commons."));
+        return jsonCompact(result);
+    }
+    if (before.value(QStringLiteral("locked")).toBool()) {
+        if (passphrase.trimmed().isEmpty()) {
+            result.insert(QStringLiteral("success"), false);
+            result.insert(QStringLiteral("locked"), true);
+            result.insert(QStringLiteral("error"),
+                          QStringLiteral("The Xenia identity is locked. Enter its passphrase to "
+                                         "unlock it."));
+            return jsonCompact(result);
+        }
+        const bool unlocked = modules().inference.unlock(passphrase);
+        const QJsonObject afterUnlock =
+            QJsonDocument::fromJson(modules().inference.identityStatus().toUtf8()).object();
+        const bool ok = unlocked && afterUnlock.value(QStringLiteral("initialized")).toBool();
+        result.insert(QStringLiteral("success"), ok);
+        result.insert(QStringLiteral("created"), false);
+        result.insert(QStringLiteral("unlocked"), ok);
+        if (!ok) {
+            result.insert(QStringLiteral("error"),
+                          QStringLiteral("Xenia could not unlock the identity. Check the "
+                                         "passphrase and try again."));
+            return jsonCompact(result);
+        }
+        result.insert(QStringLiteral("fingerprint"),
+                      afterUnlock.value(QStringLiteral("fingerprint")).toString());
+        result.insert(QStringLiteral("note"), QStringLiteral("The Xenia identity is unlocked."));
+        return jsonCompact(result);
+    }
+    if (before.value(QStringLiteral("initialized")).toBool()) {
+        result.insert(QStringLiteral("success"), true);
+        result.insert(QStringLiteral("created"), false);
+        result.insert(QStringLiteral("fingerprint"),
+                      before.value(QStringLiteral("fingerprint")).toString());
+        result.insert(QStringLiteral("note"), QStringLiteral("A Xenia identity already exists."));
+        return jsonCompact(result);
+    }
+
+    const QString mnemonic = modules().inference.createAccount(passphrase);
+    const QJsonObject after =
+        QJsonDocument::fromJson(modules().inference.identityStatus().toUtf8()).object();
+    const bool initialized = after.value(QStringLiteral("initialized")).toBool();
+    result.insert(QStringLiteral("success"), initialized);
+    result.insert(QStringLiteral("created"), initialized);
+    if (!initialized) {
+        result.insert(QStringLiteral("error"),
+                      QStringLiteral("Xenia could not create an identity. Check the Xenia "
+                                     "inference module and try again."));
+        return jsonCompact(result);
+    }
+    result.insert(QStringLiteral("fingerprint"),
+                  after.value(QStringLiteral("fingerprint")).toString());
+    if (!mnemonic.trimmed().isEmpty()) {
+        result.insert(QStringLiteral("mnemonic"), mnemonic.trimmed());
+        result.insert(QStringLiteral("warning"),
+                      QStringLiteral("Write this seed phrase down now. It is shown once and is "
+                                     "never stored by Dhun Commons."));
+    } else {
+        result.insert(QStringLiteral("note"),
+                      QStringLiteral("Xenia created a seed-file identity (no mnemonic exists)."));
     }
     return jsonCompact(result);
 }
@@ -1421,6 +2089,15 @@ QString DhunCommonsBackend::aiChat(QString requestJson)
     temperature = qBound(0.0, temperature, 2.0);
     int maxTokens = request.value(QStringLiteral("maxTokens")).toInt(900);
     maxTokens = qBound(64, maxTokens, 4096);
+
+    const QString requestedProvider = request.value(QStringLiteral("provider")).toString().trimmed().toLower();
+    const bool localOnly = request.value(QStringLiteral("localOnly")).toBool(false);
+    if (!localOnly && requestedProvider != QStringLiteral("openrouter")
+        && requestedProvider != QStringLiteral("ollama")) {
+        const QJsonObject xenia = xeniaState();
+        if (xenia.value(QStringLiteral("ready")).toBool())
+            return xeniaChat(messages, temperature, maxTokens);
+    }
 
     const QJsonObject local = localModelInfo();
     if (local.value(QStringLiteral("success")).toBool()) {
