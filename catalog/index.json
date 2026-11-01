@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 2,
+  "repositoryName": "dhun-commons",
+  "generatedAt": "2026-11-01T07:06:08Z",
+  "packages": [
+    {
+      "name": "dhun_commons",
+      "versions": [
+        {
+          "releasedAt": "2026-11-01T07:06:08Z",
+          "publisherRef": "dhun_commons-v0.5.1",
+          "url": "https://github.com/abhinavnowinew/dhun-commons/releases/download/dhun_commons-v0.5.1/dhun_commons-0.5.1.lgx",
+          "urls": [
+            "https://github.com/abhinavnowinew/dhun-commons/releases/download/dhun_commons-v0.5.1/dhun_commons-0.5.1.lgx"
+          ],
+          "size": 11242853,
+          "sha256": "b920009ef248a69551fcd842b696475acadb922fde497d17b482a7c8844044aa",
+          "rootHash": "5ac57997b8bbc8aed20cbc53a2f812b1cd0e9a521908017d0fcfb5992f71086e",
+          "manifest": {
+            "author": "Dhun Commons",
+            "category": "community",
+            "dependencies": [
+              "lez_core",
+              "chat_module",
+              "inference"
+            ],
+            "description": "A three-party seasonal treasury and field kitchen for Dhun's landscape: private multisig proposals, DHN rewards for node uptime and field work, steward profiles with background and capability review, a whole-wallet assistant that answers in the app and on Signal, routing prompts through Xenia inference over Logos delivery, with local-only Ollama menu suggestions, guest-scaled sourcing and cost estimates, zero-waste steps, farm sourcing and a guarded long-life pantry, an Open-Meteo and Ventusky agronomy and conservation advisory for the five field zones, a deterministic eight-agent civic simulation that carries water, roads, agri, safety, waste and care work behind human gates, where the agents consult, pair, hand off and peer-check each other, and live LEZ testnet accounts. Kitchen inference never falls back to a remote provider.",
+            "display_name": "Dhun Commons",
+            "hashes": {
+              "assets": "8385416e2d791e72f38e6e18a1a871fab0b79554e4736be99d70c54d8ce54c82",
+              "root": "5ac57997b8bbc8aed20cbc53a2f812b1cd0e9a521908017d0fcfb5992f71086e",
+              "variants": "ef1edb50e99f092133479c9e5a8ad5674b47fa958b09278b171adc8f06ad2189",
+              "variants/darwin-arm64": "81929942a4e85738d78964a8bfac06926dc5186bfff65033c77014f0fe7bc63b"
+            },
+            "icon": "assets/icon.png",
+            "main": {
+              "darwin-arm64": "dhun_commons_plugin.dylib"
+            },
+            "manifestVersion": "0.6.0",
+            "name": "dhun_commons",
+            "type": "ui_qml",
+            "version": "0.5.1",
+            "view": "qml/Main.qml"
+          },
+          "icon": {
+            "path": "icons/ffccad0542ef1d0d27ad1b024ced373bfa6fabc52138fde7f5a1e34dd4d03777.png",
+            "sha256": "ffccad0542ef1d0d27ad1b024ced373bfa6fabc52138fde7f5a1e34dd4d03777",
+            "size": 63797
+          }
+        }
+      ]
+    }
+  ]
+}

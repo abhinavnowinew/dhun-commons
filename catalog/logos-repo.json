@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "name": "dhun-commons",
+  "displayName": "Dhun Commons",
+  "description": "A three-party seasonal treasury and field kitchen for Dhun's landscape: LEZ testnet accounts, stewards who sign up with a name, node-day rewards through a 2-of-3 treasury, a whole-wallet assistant, free-text dish or mood planning with zero-waste steps, steward background and capability review, farm sourcing and a guarded long-life pantry.",
+  "homepage": "https://github.com/abhinavnowinew/dhun-commons",
+  "indexUrl": "https://raw.githubusercontent.com/abhinavnowinew/dhun-commons/main/catalog/index.json",
+  "trustedSigners": []
+}
