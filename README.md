@@ -438,29 +438,18 @@ Ventusky and advisory rules, [docs/CIVIC.md](docs/CIVIC.md) for the eight-agent 
 simulation, gates and limits, and [docs/TELEGRAM.md](docs/TELEGRAM.md) for
 the relay's commands, files and token boundary.
 
-## Publishing this repository
+## Source and publishing
 
-The working tree is a normal git repository with no remote configured; the 0.5.1
-release is committed on `main`. To publish it under your account:
-
-1. Create an empty repository (**Dhun Commons**, name `dhun-commons`, private is
-   recommended) at github.com/new. Do not let GitHub add a README, `.gitignore` or
-   licence; this tree already has them.
-2. Point the local repo at it and push:
+The source is public at **https://github.com/abhinavnowinew/dhun-commons** under the
+AGPL-3.0; `main` carries the 0.5.1 release. Clone it with:
 
 ```sh
-git remote add origin https://github.com/<you>/dhun-commons.git
-git push -u origin main
+git clone https://github.com/abhinavnowinew/dhun-commons.git
 ```
 
-HTTPS asks for your GitHub username and a personal access token; an SSH key is not
-set up on this machine (only `known_hosts` exists). The GitHub CLI is not installed
-either; if you install it, `gh repo create dhun-commons --private --source .
---remote origin --push` does both steps.
-
 Never add `.env`, the OpenRouter key, Signal account or group identifiers, or the
-Maps key. `.gitignore` excludes env files and CI runs a secret guard, but check
-`git status` before the first push anyway.
+Maps key. `.gitignore` excludes env files and CI runs a secret guard on every push,
+but check `git status` before pushing anyway.
 
 Basecamp apps are discovered through a module **catalog**, not a central store. The
 catalog generator and validator are in `scripts/make-catalog.mjs`; the full release
@@ -488,8 +477,8 @@ returned version 0.4.4, the icon matched its SHA-256, and the downloaded `.lgx` 
 `0fb24d303716b5b36818a25ab6358e39649186baa6fa6dd30dbfefcdf83e2285` (root hash
 `30804342e2454f3e3f8141fea70e1c078f2f5555fb65659fc0b33eb2e0cd8389`).
 
-This is static catalog hosting only. It does not publish the source repository; the
-working tree still has no git remote.
+The catalog host serves only the built LGX, index and icon; the source lives at
+**https://github.com/abhinavnowinew/dhun-commons**.
 
 CI runs on every push: bridge tests, the manifest/catalog checks and the secret guard.
 The guard fails the build if a Telegram token pattern, a Google Maps key pattern, or a

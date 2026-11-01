@@ -28,8 +28,9 @@ This repository follows it exactly: descriptor `schemaVersion` 1, index
 > rules, and steward background review with advisory capability matching. OpenRouter
 > runs only when a key is supplied at runtime; without one the assistant and planner
 > stay local. The native-map fix, Reconnect fix, Node & rewards page, steward profiles
-> and loopback vision path from 0.4.0–0.4.3 are included. The source repository still
-> has no git remote. `dist/public` holds the published files and is gitignored.
+> and loopback vision path from 0.4.0–0.4.3 are included. The source repository is
+> public at https://github.com/abhinavnowinew/dhun-commons. `dist/public` holds the
+> published files and is gitignored.
 >
 > Basecamp 0.3.2 shows the catalog URL in **Package Manager → Manage
 > Repositories** with its enabled box ticked, next to the official Logos
