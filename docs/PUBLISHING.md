@@ -15,35 +15,38 @@ This repository follows it exactly: descriptor `schemaVersion` 1, index
 `schemaVersion` 2, `rootHash` copied from `manifest.hashes.root`, and the
 `signature` key omitted for unsigned builds.
 
-> **Status.** The 0.4.4 catalog is published publicly at
-> **https://dhun-commons-atecxfewqi9.qoder.website/logos-repo.json** and wired
-> into the local Basecamp package downloader at
-> `module_data/package_downloader/3a9e34c93f16/repositories.json`. The descriptor,
-> index, icon and `.lgx` were fetched back over unauthenticated HTTPS; the `.lgx`
-> matched the index SHA-256 exactly (11,119,467 bytes,
-> `0fb24d303716b5b36818a25ab6358e39649186baa6fa6dd30dbfefcdf83e2285`, root
-> `30804342e2454f3e3f8141fea70e1c078f2f5555fb65659fc0b33eb2e0cd8389`). The index
-> lists 0.4.4 only. This build adds free-text dish, mood and occasion planning with
-> a deterministic zero-waste list, a whole-wallet assistant grounded in the reward
-> rules, and steward background review with advisory capability matching. OpenRouter
-> runs only when a key is supplied at runtime; without one the assistant and planner
-> stay local. The native-map fix, Reconnect fix, Node & rewards page, steward profiles
-> and loopback vision path from 0.4.0–0.4.3 are included. The source repository is
-> public at https://github.com/abhinavnowinew/dhun-commons. `dist/public` holds the
-> published files and is gitignored.
+> **Status.** The 0.5.1 catalog is published publicly from this repository at
+> **https://raw.githubusercontent.com/abhinavnowinew/dhun-commons/main/catalog/logos-repo.json**
+> and the package is attached to the public release
+> [dhun_commons-v0.5.1](https://github.com/abhinavnowinew/dhun-commons/releases/tag/dhun_commons-v0.5.1).
+> The descriptor, index, icon and `.lgx` were fetched back over unauthenticated
+> HTTPS; the `.lgx` matched the index SHA-256 exactly (11,242,853 bytes,
+> `b920009ef248a69551fcd842b696475acadb922fde497d17b482a7c8844044aa`, root
+> `5ac57997b8bbc8aed20cbc53a2f812b1cd0e9a521908017d0fcfb5992f71086e`). The index
+> lists 0.5.1 only. This build adds the deterministic eight-agent civic simulation
+> (consults, pairing, high-risk handoffs, peer checks, load balancing, two-task cap
+> and human gates), the Open-Meteo and Ventusky agronomy and conservation advisory,
+> steward profiles, node-day rewards through a 2-of-3 treasury, and a whole-wallet
+> assistant routed through Xenia over Logos delivery. OpenRouter runs only when a
+> key is supplied at runtime; without one the assistant and planner stay local.
+> The package is unsigned; Basecamp's signature policy must be `none` or `warn`.
+> Only the macOS arm64 (`darwin-arm64`) portable build is published. The source
+> repository is public at https://github.com/abhinavnowinew/dhun-commons under
+> AGPL-3.0. `dist` is gitignored; release assets are not in the tree.
 >
+> The earlier 0.4.4 catalog on `dhun-commons-atecxfewqi9.qoder.website` and its
+> local downloader entry
+> (`module_data/package_downloader/3a9e34c93f16/repositories.json`) are legacy.
 > Basecamp 0.3.2 shows the catalog URL in **Package Manager → Manage
 > Repositories** with its enabled box ticked, next to the official Logos
-> repository, and its Package Manager lists catalog entries with a *Source*
-> column. The Dhun Commons row itself was not read back off that screen; confirm
-> it there after a **Reload**.
+> repository. Re-read the Dhun Commons row after a **Reload**.
 
 ## 1. Bump the version
 
 Edit `metadata.json`:
 
 ```json
-"version": "0.4.4"
+"version": "0.5.1"
 ```
 
 Basecamp 0.2.3 installs a **portable** variant. Do not publish the `-dev`
@@ -59,28 +62,28 @@ NIX_CONFIG="experimental-features = nix-command flakes" nix build .#lgx-portable
 The artifact is a single `.lgx` file under `result/`. Rename it for release:
 
 ```sh
-cp result/logos-dhun_commons-module.lgx dist/dhun_commons-0.4.4.lgx
+cp result/logos-dhun_commons-module.lgx dist/dhun_commons-0.5.1.lgx
 ```
 
 ## 3. Create the GitHub release
 
 Create a public repository for the project (for example
-`OWNER/dhun-commons`) and a release tagged `dhun_commons-v0.4.4`. Attach
-`dhun_commons-0.4.4.lgx` as the release asset.
+`OWNER/dhun-commons`) and a release tagged `dhun_commons-v0.5.1`. Attach
+`dhun_commons-0.5.1.lgx` as the release asset.
 
 The asset URL becomes:
 
 ```text
-https://github.com/OWNER/dhun-commons/releases/download/dhun_commons-v0.4.4/dhun_commons-0.4.4.lgx
+https://github.com/OWNER/dhun-commons/releases/download/dhun_commons-v0.5.1/dhun_commons-0.5.1.lgx
 ```
 
 ## 4. Generate the catalog
 
 ```sh
 node scripts/make-catalog.mjs \
-  --lgx dist/dhun_commons-0.4.4.lgx \
+  --lgx dist/dhun_commons-0.5.1.lgx \
   --github OWNER/dhun-commons \
-  --release-tag dhun_commons-v0.4.4 \
+  --release-tag dhun_commons-v0.5.1 \
   --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   --out catalog
 ```
@@ -98,8 +101,8 @@ descriptor and index. Override them for GitHub Pages or another host:
 
 ```sh
 node scripts/make-catalog.mjs \
-  --lgx dist/dhun_commons-0.4.4.lgx \
-  --url https://cdn.example.org/dhun/dhun_commons-0.4.4.lgx \
+  --lgx dist/dhun_commons-0.5.1.lgx \
+  --url https://cdn.example.org/dhun/dhun_commons-0.5.1.lgx \
   --index-url https://cdn.example.org/dhun/index.json \
   --out catalog
 ```
@@ -116,7 +119,7 @@ same `rootHash` are replaced, so a rebuild is idempotent.
 ```sh
 node scripts/make-catalog.mjs --check catalog
 git add catalog/index.json catalog/logos-repo.json catalog/icons
-git commit -m "Publish Dhun Commons 0.4.4 catalog"
+git commit -m "Publish Dhun Commons 0.5.1 catalog"
 git push origin main
 ```
 

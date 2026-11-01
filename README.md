@@ -2,6 +2,14 @@
 
 A wallet and coordination surface built for the Logos Basecamp, and an application-first proposal for [RFP-005 — Multisig and Coordination](https://github.com/logos-co/rfp/blob/master/RFPs/RFP-005-multisig-and-coordination.md).
 
+> **Install in Basecamp.** Add
+> `https://raw.githubusercontent.com/abhinavnowinew/dhun-commons/main/catalog/logos-repo.json`
+> in **Settings → Repositories**, refresh the catalog, then install **Dhun Commons 0.5.1**.
+> The package is unsigned, so Basecamp's signature policy must be `none` or `warn`.
+> Only the macOS arm64 (`darwin-arm64`) portable build is published. See
+> [Public catalog](#public-catalog) and the
+> [0.5.1 release](https://github.com/abhinavnowinew/dhun-commons/releases/tag/dhun_commons-v0.5.1).
+
 The proposal is a **draft** in [docs/RFP-005-proposal.md](docs/RFP-005-proposal.md); it has not been submitted, funded or audited. The Basecamp module is a working demonstration with a real LEZ public-testnet account panel, not an on-chain multisig. See [docs/DEMO.md](docs/DEMO.md) for exactly which parts are local rehearsal data.
 
 Three parties hold one seasonal treasury:
@@ -459,23 +467,22 @@ LGX, attach it to a public release (or static host), generate `logos-repo.json` 
 
 ### Public catalog
 
-The 0.4.4 catalog is live at
-**https://dhun-commons-atecxfewqi9.qoder.website/logos-repo.json** (public, unsigned).
-Add that URL in Basecamp → Settings → Repositories. The same host serves
-`index.json`, the icon and the 11 MB `.lgx`. The index lists 0.4.4 only. The 0.4.4
-build adds free-text dish, mood and occasion planning in the Kitchen, a deterministic
-zero-waste cooking list, a whole-wallet assistant that suggests reward-earning work
-from the real rules, and steward background review with advisory capability matching
-filtered to real project ids. OpenRouter chat is available only when a key is supplied
-at runtime; without one the assistant and planner stay local. The native-map and
-Reconnect fixes, Node & rewards, steward profiles and the loopback vision path from
-0.4.0–0.4.3 are included.
+The 0.5.1 catalog is live at
+**https://raw.githubusercontent.com/abhinavnowinew/dhun-commons/main/catalog/logos-repo.json**
+(public, unsigned). Add that URL in Basecamp → Settings → Repositories, refresh the
+catalog, search for **Dhun Commons** and install 0.5.1. Its `indexUrl` serves
+`catalog/index.json` from the same repository, and the artifact is the
+[0.5.1 release asset](https://github.com/abhinavnowinew/dhun-commons/releases/download/dhun_commons-v0.5.1/dhun_commons-0.5.1.lgx).
 
-Verified on 2026-10-30 with unauthenticated HTTPS requests: the descriptor and index
-returned version 0.4.4, the icon matched its SHA-256, and the downloaded `.lgx` was
-11,119,467 bytes with SHA-256
-`0fb24d303716b5b36818a25ab6358e39649186baa6fa6dd30dbfefcdf83e2285` (root hash
-`30804342e2454f3e3f8141fea70e1c078f2f5555fb65659fc0b33eb2e0cd8389`).
+Verified on 2026-11-01 with unauthenticated HTTPS requests: the descriptor and index
+returned version 0.5.1, the icon matched its SHA-256, and the downloaded `.lgx` was
+11,242,853 bytes with SHA-256
+`b920009ef248a69551fcd842b696475acadb922fde497d17b482a7c8844044aa` (root hash
+`5ac57997b8bbc8aed20cbc53a2f812b1cd0e9a521908017d0fcfb5992f71086e`).
+
+The older 0.4.4 catalog at
+**https://dhun-commons-atecxfewqi9.qoder.website/logos-repo.json** remains online and
+lists 0.4.4 only; prefer the GitHub catalog above.
 
 The catalog host serves only the built LGX, index and icon; the source lives at
 **https://github.com/abhinavnowinew/dhun-commons**.
