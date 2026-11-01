@@ -12,5 +12,5 @@
     "check": "node bridge.mjs --check",
     "test": "node --test test/*.test.mjs"
   },
-  "license": "UNLICENSED"
+  "license": "AGPL-3.0-only"
 }

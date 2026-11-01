@@ -495,3 +495,17 @@ CI runs on every push: bridge tests, the manifest/catalog checks and the secret 
 The guard fails the build if a Telegram token pattern, a Google Maps key pattern, or a
 wallet/env file is committed. Keep the bot token in your shell or a private file, never
 in the tree.
+
+## License
+
+Dhun Commons is free software: you can redistribute it and/or modify it under the
+terms of the GNU Affero General Public License as published by the Free Software
+Foundation, version 3. See [LICENSE](LICENSE) for the full text.
+
+The AGPL's network clause applies to this project: if you run a modified Dhun Commons
+and let others interact with it over a network, you must offer those users the source
+of your modified version under the same license.
+
+Photos and produce imagery in `qml/assets/` keep their own licenses and attributions,
+listed in [qml/assets/produce/credits.json](qml/assets/produce/credits.json). The AGPL
+covers the code, configuration and documentation written for this repository.
